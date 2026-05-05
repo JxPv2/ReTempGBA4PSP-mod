@@ -21,7 +21,8 @@
 #include "common.h"
 
 #define GPSP_CONFIG_FILENAME  "tempgba.cfg"
-#define GPSP_CONFIG_NUM       (15 + 16) // options + game pad config
+#define GPSP_CONFIG_NUM         (16 + 16) // options + game pad config
+#define GPSP_CONFIG_NUM_LEGACY  (15 + 16) // before RAM block checksum reuse option
 #define GPSP_GAME_CONFIG_NUM  (7 + 16)
 
 #define COLOR_BG            COLOR15( 3,  5,  8)
@@ -860,6 +861,23 @@ void action_savestate(void)
   free(current_screen);
 }
 
+static u32 block_checksum_reuse_menu_prev = ~(u32)0;
+
+static void menu_passive_block_checksum_reuse(void)
+{
+  if (block_checksum_reuse_menu_prev == ~(u32)0)
+  {
+    block_checksum_reuse_menu_prev = option_block_checksum_reuse;
+    return;
+  }
+
+  if (option_block_checksum_reuse != block_checksum_reuse_menu_prev)
+  {
+    block_checksum_reuse_menu_prev = option_block_checksum_reuse;
+    flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
+  }
+}
+
 
 u32 menu(void)
 {
@@ -1221,6 +1239,7 @@ u32 menu(void)
 	option_clock_speed = PSP_CLOCK_333;
 	option_sound_volume = 10;
 	option_stack_optimize = 1;
+	option_block_checksum_reuse = 1;
 	option_boot_mode = 0;
 	option_update_backup = 1;		//auto
 	option_screen_capture_format = 0;
@@ -1237,6 +1256,8 @@ u32 menu(void)
 	else
 		option_language = 1;
 
+    flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
+    block_checksum_reuse_menu_prev = ~(u32)0;
   }
 
   void menu_load_cheat_file(void)
@@ -1311,6 +1332,7 @@ u32 menu(void)
 
   void submenu_emulator(void)
   {
+    block_checksum_reuse_menu_prev = ~(u32)0;
     DRAW_TITLE_OPT_GBK(MSG_OPTION_MENU_TITLE);
   }
 
@@ -1490,6 +1512,8 @@ u32 menu(void)
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_5], clock_speed_options, &option_clock_speed, 4, MSG_OPTION_MENU_HELP_5, 7), 
 
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_6], sound_volume_options, &option_sound_volume, 11, MSG_OPTION_MENU_HELP_6, 8),
+
+    STRING_SELECTION_OPTION(menu_passive_block_checksum_reuse, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], on_off_options, &option_block_checksum_reuse, 2, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 9),
 
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 10),
 
@@ -2201,16 +2225,17 @@ s32 save_config_file(void)
     file_options[6] = option_clock_speed;
     file_options[7]  = option_sound_volume;
     file_options[8]  = option_stack_optimize;
-    file_options[9]  = option_boot_mode;
-    file_options[10]  = option_update_backup;
-    file_options[11]  = option_screen_capture_format;
-    file_options[12]  = option_enable_analog;
-    file_options[13]  = option_analog_sensitivity;
-    file_options[14] = option_language;
+    file_options[9]  = option_block_checksum_reuse;
+    file_options[10]  = option_boot_mode;
+    file_options[11]  = option_update_backup;
+    file_options[12]  = option_screen_capture_format;
+    file_options[13]  = option_enable_analog;
+    file_options[14]  = option_analog_sensitivity;
+    file_options[15] = option_language;
 
     for (i = 0; i < 16; i++)
     {
-      file_options[15 + i] = gamepad_config_map[i];
+      file_options[16 + i] = gamepad_config_map[i];
     }
 
     FILE_WRITE_ARRAY(config_file, file_options);
@@ -2308,7 +2333,6 @@ s32 load_config_file(void)
   {
     u32 file_size = file_length(config_path);
 
-    // Sanity check: File size must be the right size
     if (file_size == (GPSP_CONFIG_NUM * 4))
     {
       u32 i;
@@ -2326,6 +2350,45 @@ s32 load_config_file(void)
       option_clock_speed     = file_options[6] % 4;
       option_sound_volume   = file_options[7] % 11;
       option_stack_optimize = file_options[8] % 2;
+      option_block_checksum_reuse = file_options[9] % 2;
+      option_boot_mode      = file_options[10] % 2;
+      option_update_backup  = file_options[11] % 2;
+      option_screen_capture_format = file_options[12] % 2;
+      option_enable_analog  = file_options[13] % 2;
+      option_analog_sensitivity = file_options[14] % 10;
+      option_language       = file_options[15] % 4;
+
+      for (i = 0; i < 16; i++)
+      {
+        gamepad_config_map[i] = file_options[16 + i] % (BUTTON_ID_NONE + 1);
+
+        if (gamepad_config_map[i] == BUTTON_ID_MENU)
+          menu_button = i;
+      }
+
+      if ((enable_home_menu == 0) && (menu_button == -1))
+        gamepad_config_map[0] = BUTTON_ID_MENU;
+
+      FILE_CLOSE(config_file);
+    }
+    else if (file_size == (GPSP_CONFIG_NUM_LEGACY * 4))
+    {
+      u32 i;
+      u32 file_options[file_size / 4];
+      s32 menu_button = -1;
+
+      FILE_READ_ARRAY(config_file, file_options);
+
+      option_screen_scale   = file_options[0] % 5;
+      option_screen_mag     = file_options[1] % 201;
+      option_screen_filter  = file_options[2] % 2;
+      psp_fps_debug       = file_options[3] % 2;
+      option_frameskip_type  = file_options[4] % 3;
+      option_frameskip_value = file_options[5];
+      option_clock_speed     = file_options[6] % 4;
+      option_sound_volume   = file_options[7] % 11;
+      option_stack_optimize = file_options[8] % 2;
+      option_block_checksum_reuse = 1;
       option_boot_mode      = file_options[9] % 2;
       option_update_backup  = file_options[10] % 2;
       option_screen_capture_format = file_options[11] % 2;
@@ -2346,6 +2409,8 @@ s32 load_config_file(void)
 
       FILE_CLOSE(config_file);
     }
+    else
+      FILE_CLOSE(config_file);
 
     return 0;
   }
@@ -2356,6 +2421,7 @@ s32 load_config_file(void)
   psp_fps_debug = 0;
   option_sound_volume = 10;
   option_stack_optimize = 1;
+  option_block_checksum_reuse = 1;
   option_boot_mode = 0;
   option_update_backup = 1;		//auto
   option_screen_capture_format = 0;

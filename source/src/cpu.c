@@ -3401,7 +3401,6 @@ static u8 *translate_block_##type(u32 pc)                                     \
                                                                               \
     /* Where can we modify the address of the current header for linking? */  \
     ReuseHeader **HeaderAddr = &writable_checksum_hash[checksum & (WRITABLE_HASH_SIZE - 1)]; \
-    /* Where is the current header? */                                        \
     ReuseHeader *Header = *HeaderAddr;                                        \
     while (Header != NULL)                                                    \
     {                                                                         \
@@ -3409,26 +3408,35 @@ static u8 *translate_block_##type(u32 pc)                                     \
        && Header->GBACodeSize == (block_end_pc - block_start_pc)              \
        && memcmp(opcodes.type, Header + 1, Header->GBACodeSize) == 0)         \
       {                                                                       \
-        u8 *NativeCode = (u8 *)(Header + 1) + Header->GBACodeSize;            \
-        if ((((u32)NativeCode) & (CODE_ALIGN_SIZE - 1)) != 0)                 \
+        if (option_block_checksum_reuse != 0)                                 \
         {                                                                     \
-          NativeCode += CODE_ALIGN_SIZE - (((u32)NativeCode) & (CODE_ALIGN_SIZE - 1)); \
+          u8 *NativeCode = (u8 *)(Header + 1) + Header->GBACodeSize;          \
+          if ((((u32)NativeCode) & (CODE_ALIGN_SIZE - 1)) != 0)                 \
+          {                                                                   \
+            NativeCode += CODE_ALIGN_SIZE - (((u32)NativeCode) & (CODE_ALIGN_SIZE - 1)); \
+          }                                                                   \
+                                                                              \
+          /* Adjust the Metadata Entries for the GBA Data Words that were     \
+           * just reused, as if they had been recompiled. */                \
+          pc = block_end_pc;                                                  \
+          for (block_end_pc = block_start_pc;                                 \
+               block_end_pc < pc;                                             \
+               block_end_pc += type##_instruction_width)                      \
+          {                                                                   \
+            smc_write_##type##_yes();                                         \
+          }                                                                   \
+          unconditional_branch_write_##type##_yes();                          \
+                                                                              \
+          update_metadata_area_end(pc);                                       \
+                                                                              \
+          return NativeCode;                                                  \
         }                                                                     \
-                                                                              \
-        /* Adjust the Metadata Entries for the GBA Data Words that were       \
-         * just reused, as if they had been recompiled. */                    \
-        pc = block_end_pc;                                                    \
-        for (block_end_pc = block_start_pc;                                   \
-             block_end_pc < pc;                                               \
-             block_end_pc += type##_instruction_width)                        \
-        {                                                                     \
-          smc_write_##type##_yes();                                           \
-        }                                                                     \
-        unconditional_branch_write_##type##_yes();                            \
-                                                                              \
-        update_metadata_area_end(pc);                                         \
-                                                                              \
-        return NativeCode;                                                    \
+        /* Reuse disabled: drop this header from the chain so we do not       \
+         * append a duplicate entry for the same GBA block (would corrupt   \
+         * the reuse list). Orphaned cache bytes until the next flush. */     \
+        *HeaderAddr = Header->Next;                                           \
+        Header = *HeaderAddr;                                                 \
+        continue;                                                             \
       }                                                                       \
                                                                               \
       HeaderAddr = &Header->Next;                                             \

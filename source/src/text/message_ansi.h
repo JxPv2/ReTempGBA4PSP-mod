@@ -185,6 +185,12 @@
     // MSG_OPTION_MENU_HELP_11
     "[O]:Main menu",
 
+    // MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE
+    "RAM block reuse   : %s",
+
+    // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
+    "[<] [>] :Select   emulator",
+
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-3s %2d:%02d:%02d",
 
@@ -733,6 +739,12 @@
     // MSG_OPTION_MENU_HELP_11
     "○:主菜单",
 
+    // MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE
+    "RAM块校验复用: %s",
+
+    // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
+    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":选择   模拟器配置",
+
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%02d/%02d %-4s %2d:%02d:%02d",
 
@@ -1280,6 +1292,12 @@
 
     // MSG_OPTION_MENU_HELP_11
     "○:主菜單",
+
+    // MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE
+    "RAM塊校驗複用: %s",
+
+    // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
+    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":選擇   模擬器配置",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-4s %2d:%02d:%02d",
