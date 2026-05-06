@@ -934,6 +934,8 @@ inline static CPU_ALERT_TYPE check_smc_write(u16 *metadata, u32 offset, u8 regio
    * location. See "doc/partial flushing of RAM code.txt" for more info. */
   u16 smc = metadata[offset | 3] & 0x03;
   if (smc != 0) {
+    /* Policy is applied inside partial_clear_metadata():
+     * partial clear for partial modes, full writable flush for full-flush mode. */
     partial_clear_metadata(offset, region);
     return CPU_ALERT_SMC;
   }

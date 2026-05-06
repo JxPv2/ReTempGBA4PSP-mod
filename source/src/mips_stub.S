@@ -3145,7 +3145,7 @@ smc_write_update_gba:
 # $6 = Program Counter, which is immediately looked up
 smc_write:
   save_registers
-  jal partial_clear_metadata      # flush some of the translation cache
+  jal partial_clear_metadata      # partial clear or full flush (policy-driven)
   sw $6, REG_PC($16)              # save PC (delay slot)
   blez $17, smc_write_update_gba  # if counter <= 0
   nop

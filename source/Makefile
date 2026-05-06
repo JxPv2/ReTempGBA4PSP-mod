@@ -25,7 +25,7 @@ COMMON_FILE = \
  ku_bridge.h exception.h ch_print.h
 
 MAINOBJS = \
- cpu.o memory.o video.o psp_video.o input.o sound.o main.o message.o mh_print.o gui.o zip.o png.o \
+ cpu.o memory.o video_cc.o psp_video.o input.o sound.o main.o message.o mh_print.o gui.o zip.o png.o \
  mips_stub.o \
  ku_bridge.o exception.o cheats.o ch_print.o
 
@@ -45,6 +45,8 @@ CFLAGS = \
  -falign-functions=32 -falign-loops -falign-labels -falign-jumps \
  -Wall -Wundef -Wpointer-arith -Wbad-function-cast -Wwrite-strings -Wmissing-prototypes -Wsign-compare \
  -DZLIB_CONST
+
+CXXFLAGS = ${CFLAGS}
 
 ASFLAGS = ${CFLAGS}
 

@@ -48,13 +48,19 @@
 #define CONFIRMATION_CONT  1
 #define CONFIRMATION_QUIT  2
 
+// RAM dynarec policy
+#define RAM_DYNAREC_FULL_FLUSH         0
+#define RAM_DYNAREC_PARTIAL_NO_REUSE   1
+#define RAM_DYNAREC_PARTIAL_WITH_REUSE 2
+
 
 extern u32 option_screen_scale;
 extern u32 option_screen_mag;
 extern u32 option_screen_filter;
 extern u32 option_sound_volume;
 extern u32 option_stack_optimize;
-extern u32 option_block_checksum_reuse;
+extern u32 option_ram_dynarec_policy;
+extern u32 option_oam_hijacking_enabled;
 extern u32 option_boot_mode;
 extern u32 option_update_backup;
 extern u32 option_screen_capture_format;

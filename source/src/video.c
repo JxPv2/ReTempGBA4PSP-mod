@@ -108,6 +108,7 @@ static void fill_line_alpha(u16 color, render_scanline_dest_alpha *dest_ptr, u32
 static void fill_line_color16(u16 color, render_scanline_dest_color16 *dest_ptr, u32 start, u32 end);
 static void fill_line_color32(u16 color, render_scanline_dest_color32 *dest_ptr, u32 start, u32 end);
 static void expand_blend(u32 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end, u16 bldcnt);
+static void expand_blend_c(u32 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end, u16 bldcnt);
 static void expand_darken(u16 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end, u16 bldcnt);
 static void expand_brighten(u16 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end, u16 bldcnt);
 static void expand_darken_partial_alpha(u32 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end, u16 bldcnt);
@@ -2336,7 +2337,32 @@ fill_line_builder(color32);
 
 #define expand_normal(screen_ptr, start, end)
 
+#ifdef __mips__
+extern void expand_blend_mips(u32 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end);
+#endif
+
 static void expand_blend(u32 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end, u16 bldcnt)
+{
+#ifdef __mips__
+  u16 bldalpha = pIO_REG(REG_BLDALPHA);
+  s32 blend_a = LIMIT_MAX((bldalpha & 0x1F), 16);
+  s32 blend_b = LIMIT_MAX(((bldalpha >> 8) & 0x1F), 16);
+
+  /* Keep parity with C path on the rare saturating blend case. */
+  if ((blend_a + blend_b) > 16)
+  {
+    expand_blend_c(screen_src_ptr, screen_dest_ptr, start, end, bldcnt);
+  }
+  else
+  {
+    expand_blend_mips(screen_src_ptr, screen_dest_ptr, start, end);
+  }
+#else
+  expand_blend_c(screen_src_ptr, screen_dest_ptr, start, end, bldcnt);
+#endif
+}
+
+static void expand_blend_c(u32 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end, u16 bldcnt)
 {
   u32 pixel_pair;
   u32 pixel_top, pixel_bottom;

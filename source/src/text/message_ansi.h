@@ -186,7 +186,7 @@
     "[O]:Main menu",
 
     // MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE
-    "RAM block reuse   : %s",
+    "RAM dynarec mode  : %s",
 
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     "[<] [>] :Select   emulator",
@@ -447,6 +447,15 @@
 
     // MSG_MANUAL
     "MANUAL",
+
+    // MSG_RAM_DYNAREC_FULL_FLUSH
+    "Full flush",
+
+    // MSG_RAM_DYNAREC_PARTIAL_NO_REUSE
+    "Partial no reuse",
+
+    // MSG_RAM_DYNAREC_PARTIAL_WITH_REUSE
+    "Partial + reuse",
 
     // MSG_EXITONLY
     "Exit Only",
@@ -740,7 +749,7 @@
     "○:主菜单",
 
     // MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE
-    "RAM块校验复用: %s",
+    "RAM动态重编译: %s",
 
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":选择   模拟器配置",
@@ -1001,6 +1010,15 @@
 
     // MSG_MANUAL
     "手动",
+
+    // MSG_RAM_DYNAREC_FULL_FLUSH
+    "完全清空",
+
+    // MSG_RAM_DYNAREC_PARTIAL_NO_REUSE
+    "局部清空-不复用",
+
+    // MSG_RAM_DYNAREC_PARTIAL_WITH_REUSE
+    "局部清空+复用",
 
     // MSG_EXITONLY
     "退出时",
@@ -1294,7 +1312,7 @@
     "○:主菜單",
 
     // MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE
-    "RAM塊校驗複用: %s",
+    "RAM動態重編譯: %s",
 
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":選擇   模擬器配置",
@@ -1555,6 +1573,15 @@
 
     // MSG_MANUAL
     "手動",
+
+    // MSG_RAM_DYNAREC_FULL_FLUSH
+    "完全清空",
+
+    // MSG_RAM_DYNAREC_PARTIAL_NO_REUSE
+    "局部清空-不複用",
+
+    // MSG_RAM_DYNAREC_PARTIAL_WITH_REUSE
+    "局部清空+複用",
 
     // MSG_EXITONLY
     "退出時",

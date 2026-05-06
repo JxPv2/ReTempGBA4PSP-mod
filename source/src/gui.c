@@ -21,8 +21,8 @@
 #include "common.h"
 
 #define GPSP_CONFIG_FILENAME  "tempgba.cfg"
-#define GPSP_CONFIG_NUM         (16 + 16) // options + game pad config
-#define GPSP_CONFIG_NUM_LEGACY  (15 + 16) // before RAM block checksum reuse option
+#define GPSP_CONFIG_NUM         (17 + 16) // options + game pad config
+#define GPSP_CONFIG_NUM_LEGACY  (16 + 16) // before OAM hijack option
 #define GPSP_GAME_CONFIG_NUM  (7 + 16)
 
 #define COLOR_BG            COLOR15( 3,  5,  8)
@@ -861,19 +861,19 @@ void action_savestate(void)
   free(current_screen);
 }
 
-static u32 block_checksum_reuse_menu_prev = ~(u32)0;
+static u32 ram_dynarec_policy_menu_prev = ~(u32)0;
 
-static void menu_passive_block_checksum_reuse(void)
+static void menu_passive_ram_dynarec_policy(void)
 {
-  if (block_checksum_reuse_menu_prev == ~(u32)0)
+  if (ram_dynarec_policy_menu_prev == ~(u32)0)
   {
-    block_checksum_reuse_menu_prev = option_block_checksum_reuse;
+    ram_dynarec_policy_menu_prev = option_ram_dynarec_policy;
     return;
   }
 
-  if (option_block_checksum_reuse != block_checksum_reuse_menu_prev)
+  if (option_ram_dynarec_policy != ram_dynarec_policy_menu_prev)
   {
-    block_checksum_reuse_menu_prev = option_block_checksum_reuse;
+    ram_dynarec_policy_menu_prev = option_ram_dynarec_policy;
     flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
   }
 }
@@ -965,6 +965,13 @@ u32 menu(void)
   {
     MSG[MSG_EXITONLY],
     MSG[MSG_AUTO]
+  };
+
+  const char *ram_dynarec_options[] =
+  {
+    MSG[MSG_RAM_DYNAREC_FULL_FLUSH],
+    MSG[MSG_RAM_DYNAREC_PARTIAL_NO_REUSE],
+    MSG[MSG_RAM_DYNAREC_PARTIAL_WITH_REUSE]
   };
 
   const char *language_option[] =
@@ -1239,7 +1246,8 @@ u32 menu(void)
 	option_clock_speed = PSP_CLOCK_333;
 	option_sound_volume = 10;
 	option_stack_optimize = 1;
-	option_block_checksum_reuse = 1;
+	option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+	option_oam_hijacking_enabled = 0;
 	option_boot_mode = 0;
 	option_update_backup = 1;		//auto
 	option_screen_capture_format = 0;
@@ -1257,7 +1265,7 @@ u32 menu(void)
 		option_language = 1;
 
     flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
-    block_checksum_reuse_menu_prev = ~(u32)0;
+    ram_dynarec_policy_menu_prev = ~(u32)0;
   }
 
   void menu_load_cheat_file(void)
@@ -1332,7 +1340,7 @@ u32 menu(void)
 
   void submenu_emulator(void)
   {
-    block_checksum_reuse_menu_prev = ~(u32)0;
+    ram_dynarec_policy_menu_prev = ~(u32)0;
     DRAW_TITLE_OPT_GBK(MSG_OPTION_MENU_TITLE);
   }
 
@@ -1513,19 +1521,21 @@ u32 menu(void)
 
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_6], sound_volume_options, &option_sound_volume, 11, MSG_OPTION_MENU_HELP_6, 8),
 
-    STRING_SELECTION_OPTION(menu_passive_block_checksum_reuse, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], on_off_options, &option_block_checksum_reuse, 2, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 9),
+    STRING_SELECTION_OPTION(menu_passive_ram_dynarec_policy, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], ram_dynarec_options, &option_ram_dynarec_policy, 3, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 9),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 10),
+    STRING_SELECTION_OPTION(NULL, "OAM hijack support: %s", on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 10),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 11),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 11),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 12), 
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 12),
 
-    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 14), 
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 13), 
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 16),
+    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 15), 
 
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 17)
+    ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 17),
+
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 18)
   };
 
   MAKE_MENU(emulator, NULL, NULL);
@@ -2225,17 +2235,19 @@ s32 save_config_file(void)
     file_options[6] = option_clock_speed;
     file_options[7]  = option_sound_volume;
     file_options[8]  = option_stack_optimize;
-    file_options[9]  = option_block_checksum_reuse;
-    file_options[10]  = option_boot_mode;
-    file_options[11]  = option_update_backup;
-    file_options[12]  = option_screen_capture_format;
-    file_options[13]  = option_enable_analog;
-    file_options[14]  = option_analog_sensitivity;
-    file_options[15] = option_language;
+    /* Store mode with +4 marker so old 0/1 boolean configs can be migrated. */
+    file_options[9]  = option_ram_dynarec_policy + 4;
+    file_options[10]  = option_oam_hijacking_enabled;
+    file_options[11]  = option_boot_mode;
+    file_options[12]  = option_update_backup;
+    file_options[13]  = option_screen_capture_format;
+    file_options[14]  = option_enable_analog;
+    file_options[15]  = option_analog_sensitivity;
+    file_options[16] = option_language;
 
     for (i = 0; i < 16; i++)
     {
-      file_options[16 + i] = gamepad_config_map[i];
+      file_options[17 + i] = gamepad_config_map[i];
     }
 
     FILE_WRITE_ARRAY(config_file, file_options);
@@ -2350,17 +2362,34 @@ s32 load_config_file(void)
       option_clock_speed     = file_options[6] % 4;
       option_sound_volume   = file_options[7] % 11;
       option_stack_optimize = file_options[8] % 2;
-      option_block_checksum_reuse = file_options[9] % 2;
-      option_boot_mode      = file_options[10] % 2;
-      option_update_backup  = file_options[11] % 2;
-      option_screen_capture_format = file_options[12] % 2;
-      option_enable_analog  = file_options[13] % 2;
-      option_analog_sensitivity = file_options[14] % 10;
-      option_language       = file_options[15] % 4;
+      {
+        u32 stored_ram_dynarec_policy = file_options[9];
+        if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
+        {
+          option_ram_dynarec_policy = stored_ram_dynarec_policy - 4;
+        }
+        else if (stored_ram_dynarec_policy <= 1)
+        {
+          /* Migration path from old bool option:
+           * OFF(0)->Partial no reuse, ON(1)->Partial with reuse. */
+          option_ram_dynarec_policy = stored_ram_dynarec_policy + 1;
+        }
+        else
+        {
+          option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+        }
+      }
+      option_oam_hijacking_enabled = file_options[10] % 2;
+      option_boot_mode      = file_options[11] % 2;
+      option_update_backup  = file_options[12] % 2;
+      option_screen_capture_format = file_options[13] % 2;
+      option_enable_analog  = file_options[14] % 2;
+      option_analog_sensitivity = file_options[15] % 10;
+      option_language       = file_options[16] % 4;
 
       for (i = 0; i < 16; i++)
       {
-        gamepad_config_map[i] = file_options[16 + i] % (BUTTON_ID_NONE + 1);
+        gamepad_config_map[i] = file_options[17 + i] % (BUTTON_ID_NONE + 1);
 
         if (gamepad_config_map[i] == BUTTON_ID_MENU)
           menu_button = i;
@@ -2388,17 +2417,18 @@ s32 load_config_file(void)
       option_clock_speed     = file_options[6] % 4;
       option_sound_volume   = file_options[7] % 11;
       option_stack_optimize = file_options[8] % 2;
-      option_block_checksum_reuse = 1;
+      option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+      option_oam_hijacking_enabled = 0;
       option_boot_mode      = file_options[9] % 2;
       option_update_backup  = file_options[10] % 2;
       option_screen_capture_format = file_options[11] % 2;
       option_enable_analog  = file_options[12] % 2;
       option_analog_sensitivity = file_options[13] % 10;
-      option_language       = file_options[14] % 4;
+      option_language       = file_options[15] % 4;
 
       for (i = 0; i < 16; i++)
       {
-        gamepad_config_map[i] = file_options[15 + i] % (BUTTON_ID_NONE + 1);
+        gamepad_config_map[i] = file_options[16 + i] % (BUTTON_ID_NONE + 1);
 
         if (gamepad_config_map[i] == BUTTON_ID_MENU)
           menu_button = i;
@@ -2421,7 +2451,8 @@ s32 load_config_file(void)
   psp_fps_debug = 0;
   option_sound_volume = 10;
   option_stack_optimize = 1;
-  option_block_checksum_reuse = 1;
+  option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+  option_oam_hijacking_enabled = 0;
   option_boot_mode = 0;
   option_update_backup = 1;		//auto
   option_screen_capture_format = 0;

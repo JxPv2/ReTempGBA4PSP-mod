@@ -88,6 +88,17 @@ u32 ALIGN_DATA spsr[7];
 #define rom_metadata_area   METADATA_AREA_ROM
 #define bios_metadata_area  METADATA_AREA_BIOS
 
+#define BRANCH_TARGET_IS_BIOS_OR_ROM(addr)                                    \
+  ((addr) < 0x00004000 ||                                                     \
+   ((addr) >= 0x08000000 && (addr) < 0x0E000000))
+
+#define BRANCH_TARGET_IS_WRITABLE_RAM(addr)                                   \
+  ((((addr) >> 24) == 0x02) || (((addr) >> 24) == 0x03) || (((addr) >> 24) == 0x06))
+
+#define BRANCH_TARGET_CAN_BE_LINKED(addr)                                     \
+  (BRANCH_TARGET_IS_BIOS_OR_ROM(addr) ||                                      \
+   ((option_ram_dynarec_policy == RAM_DYNAREC_FULL_FLUSH) && BRANCH_TARGET_IS_WRITABLE_RAM(addr)))
+
 #define MAX_BLOCK_SIZE (8192)
 #define MAX_EXITS      (256)
 
@@ -3408,7 +3419,7 @@ static u8 *translate_block_##type(u32 pc)                                     \
        && Header->GBACodeSize == (block_end_pc - block_start_pc)              \
        && memcmp(opcodes.type, Header + 1, Header->GBACodeSize) == 0)         \
       {                                                                       \
-        if (option_block_checksum_reuse != 0)                                 \
+        if (option_ram_dynarec_policy != RAM_DYNAREC_PARTIAL_NO_REUSE)        \
         {                                                                     \
           u8 *NativeCode = (u8 *)(Header + 1) + Header->GBACodeSize;          \
           if ((((u32)NativeCode) & (CODE_ALIGN_SIZE - 1)) != 0)                 \
@@ -3545,8 +3556,7 @@ static u8 *translate_block_##type(u32 pc)                                     \
        * block statically below. THIS BEHAVIOUR NEEDS TO BE DUPLICATED IN THE \
        * EMITTER. Please see your emitter's generate_branch_no_cycle_update   \
        * macro for more information. */                                       \
-      if ( branch_target < 0x00004000 ||                                      \
-          (branch_target >= 0x08000000 && branch_target < 0x0E000000))        \
+      if (BRANCH_TARGET_CAN_BE_LINKED(branch_target))                         \
       {                                                                       \
         if (i != external_block_exit_position)                                \
         {                                                                     \
@@ -3690,6 +3700,12 @@ static void update_metadata_area_end(u32 pc)
  */
 void partial_clear_metadata(u32 offset, u8 region)
 {
+  if (option_ram_dynarec_policy == RAM_DYNAREC_FULL_FLUSH)
+  {
+    flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
+    return;
+  }
+
   // 1. Determine where the Metadata Entry for this Data Word is.
   u16 *metadata;
 

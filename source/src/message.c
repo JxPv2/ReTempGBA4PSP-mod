@@ -211,7 +211,7 @@ const char *message[4][MSG_END] =
     "??:???C?????j???[",
 
     // MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE
-    "RAM block reuse   : %s",
+    "RAM dynarec mode  : %s",
 
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     "\x81\xA8\x81\xA9" ":?I??   ?G?~?????[?^",
@@ -472,6 +472,15 @@ const char *message[4][MSG_END] =
 
     // MSG_MANUAL
     "????",
+
+    // MSG_RAM_DYNAREC_FULL_FLUSH
+    "SMC?S??:????",
+
+    // MSG_RAM_DYNAREC_PARTIAL_NO_REUSE
+    "SMC?S??:?????A?L",
+
+    // MSG_RAM_DYNAREC_PARTIAL_WITH_REUSE
+    "SMC?S??:?????L",
 
     // MSG_EXITONLY
     "?I????????",
