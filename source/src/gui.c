@@ -21,8 +21,9 @@
 #include "common.h"
 
 #define GPSP_CONFIG_FILENAME  "tempgba.cfg"
-#define GPSP_CONFIG_NUM         (18 + 16) // options + game pad config
-#define GPSP_CONFIG_NUM_LEGACY  (17 + 16) // before renderer option
+#define GPSP_CONFIG_NUM              (19 + 16) // options + game pad config
+#define GPSP_CONFIG_NUM_PRE_IDLE_LOOP (18 + 16) // before idle-loop option
+#define GPSP_CONFIG_NUM_LEGACY       (17 + 16) // before renderer option
 #define GPSP_GAME_CONFIG_NUM  (7 + 16)
 
 #define COLOR_BG            COLOR15( 3,  5,  8)
@@ -1549,17 +1550,19 @@ u32 menu(void)
 
     STRING_SELECTION_OPTION(menu_passive_ram_dynarec_policy, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], ram_dynarec_options, &option_ram_dynarec_policy, 3, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 9),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 10),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_IDLE_LOOP_OPTIMIZE], on_off_options, &option_idle_loop_optimize, 2, MSG_IDLE_LOOP_OPTIMIZE_HELP, 10),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 11),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 11),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 12), 
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 12),
 
-    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 13), 
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 13), 
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 15),
+    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 14), 
 
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 16)
+    ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 16),
+
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 17)
   };
 
   MAKE_MENU(emulator, NULL, NULL);
@@ -2269,10 +2272,11 @@ s32 save_config_file(void)
     file_options[15]  = option_enable_analog;
     file_options[16]  = option_analog_sensitivity;
     file_options[17] = option_language;
+    file_options[18] = option_idle_loop_optimize;
 
     for (i = 0; i < 16; i++)
     {
-      file_options[18 + i] = gamepad_config_map[i];
+      file_options[19 + i] = gamepad_config_map[i];
     }
 
     FILE_WRITE_ARRAY(config_file, file_options);
@@ -2412,6 +2416,62 @@ s32 load_config_file(void)
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
       option_language       = file_options[17] % 4;
+      option_idle_loop_optimize = file_options[18] % 2;
+
+      for (i = 0; i < 16; i++)
+      {
+        gamepad_config_map[i] = file_options[19 + i] % (BUTTON_ID_NONE + 1);
+
+        if (gamepad_config_map[i] == BUTTON_ID_MENU)
+          menu_button = i;
+      }
+
+      if ((enable_home_menu == 0) && (menu_button == -1))
+        gamepad_config_map[0] = BUTTON_ID_MENU;
+
+      FILE_CLOSE(config_file);
+    }
+    else if (file_size == (GPSP_CONFIG_NUM_PRE_IDLE_LOOP * 4))
+    {
+      u32 i;
+      u32 file_options[file_size / 4];
+      s32 menu_button = -1;
+
+      FILE_READ_ARRAY(config_file, file_options);
+
+      option_screen_scale   = file_options[0] % 5;
+      option_screen_mag     = file_options[1] % 201;
+      option_screen_filter  = file_options[2] % 2;
+      psp_fps_debug       = file_options[3] % 2;
+      option_frameskip_type  = file_options[4] % 3;
+      option_frameskip_value = file_options[5];
+      option_clock_speed     = file_options[6] % 4;
+      option_sound_volume   = file_options[7] % 11;
+      option_stack_optimize = file_options[8] % 2;
+      {
+        u32 stored_ram_dynarec_policy = file_options[9];
+        if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
+        {
+          option_ram_dynarec_policy = stored_ram_dynarec_policy - 4;
+        }
+        else if (stored_ram_dynarec_policy <= 1)
+        {
+          option_ram_dynarec_policy = stored_ram_dynarec_policy + 1;
+        }
+        else
+        {
+          option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+        }
+      }
+      option_video_renderer = file_options[10] % 2;
+      option_oam_hijacking_enabled = file_options[11] % 2;
+      option_boot_mode      = file_options[12] % 2;
+      option_update_backup  = file_options[13] % 2;
+      option_screen_capture_format = file_options[14] % 2;
+      option_enable_analog  = file_options[15] % 2;
+      option_analog_sensitivity = file_options[16] % 10;
+      option_language       = file_options[17] % 4;
+      option_idle_loop_optimize = 0;
 
       for (i = 0; i < 16; i++)
       {
@@ -2453,6 +2513,7 @@ s32 load_config_file(void)
           option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
       }
       option_video_renderer = VIDEO_RENDERER_NEW;
+      option_idle_loop_optimize = 0;
       option_oam_hijacking_enabled = file_options[10] % 2;
       option_boot_mode      = file_options[11] % 2;
       option_update_backup  = file_options[12] % 2;
@@ -2493,6 +2554,7 @@ s32 load_config_file(void)
       option_stack_optimize = file_options[8] % 2;
       option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
       option_video_renderer = VIDEO_RENDERER_NEW;
+      option_idle_loop_optimize = 0;
       option_oam_hijacking_enabled = 0;
       option_boot_mode      = file_options[9] % 2;
       option_update_backup  = file_options[10] % 2;
@@ -2527,6 +2589,7 @@ s32 load_config_file(void)
   option_stack_optimize = 1;
   option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
   option_video_renderer = VIDEO_RENDERER_NEW;
+  option_idle_loop_optimize = 0;
   option_oam_hijacking_enabled = 0;
   option_boot_mode = 0;
   option_update_backup = 1;		//auto

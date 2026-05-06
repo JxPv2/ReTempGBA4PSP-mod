@@ -2716,8 +2716,13 @@ static void thumb_flag_status(BlockDataThumbType *block_data, u16 opcode)
   u16 *location;                                                              \
   u32 block_tag;                                                              \
   u8 *block_address;                                                          \
+  u8 *idle_tramp;                                                             \
                                                                               \
   block_lookup_address_pc_##type();                                           \
+                                                                              \
+  idle_tramp = cpu_idle_loop_on_block_lookup(pc, thumb);                      \
+  if (idle_tramp != NULL)                                                     \
+    return idle_tramp;                                                        \
                                                                               \
   switch (pc >> 24)                                                           \
   {                                                                           \
@@ -4042,6 +4047,8 @@ void init_cpu(void)
 
   reg[CPU_HALT_STATE] = CPU_ACTIVE;
   reg[CHANGED_PC_STATUS] = 0;
+
+  cpu_auto_idle_loop_reset();
 }
 
 
@@ -4053,6 +4060,7 @@ void init_cpu(void)
 void cpu_read_savestate(SceUID savestate_file)
 {
   CPU_SAVESTATE_BODY(READ);
+  cpu_auto_idle_loop_reset();
 }
 
 void cpu_write_mem_savestate(SceUID savestate_file)

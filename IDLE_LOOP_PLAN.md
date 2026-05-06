@@ -1,5 +1,9 @@
 # Plan: Idle loop detection / removal (mGBA-style)
 
+**Status (implemented):** Optional **Emulator → Idle loop optimize** (`option_idle_loop_optimize`, default off). Core logic in `source/src/cpu_idle_loop.c`; fast path `idle_loop_enter_update_gba` in `mips_stub.S`; hook in `block_lookup_address_body` (`cpu.c`). Config size is now `(19+16)` u32 words; older `(18+16)` configs migrate with idle off.
+
+---
+
 Goal: Speed up games that spend many cycles in **Thumb busy-wait loops** (e.g. polling `DISPSTAT` / VCount) by detecting a tight loop head and **fast-forwarding** to the next timing boundary, without changing behavior when the option is off.
 
 Reference algorithm: mGBA `GBASetActiveRegion` + `_analyzeForIdleLoop` in [`mgba/src/gba/memory.c`](https://github.com/mgba-emu/mgba/blob/master/src/gba/memory.c) (study the logic; reimplement to avoid license mixing).

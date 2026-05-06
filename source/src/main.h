@@ -65,6 +65,7 @@ extern u32 option_sound_volume;
 extern u32 option_stack_optimize;
 extern u32 option_ram_dynarec_policy;
 extern u32 option_video_renderer;
+extern u32 option_idle_loop_optimize;
 extern u32 option_oam_hijacking_enabled;
 extern u32 option_boot_mode;
 extern u32 option_update_backup;

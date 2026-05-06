@@ -20,6 +20,7 @@
 .align 4
 
 .global mips_update_gba
+.global idle_loop_enter_update_gba
 .global mips_indirect_branch_arm
 .global mips_indirect_branch_thumb
 .global mips_indirect_branch_dual
@@ -270,6 +271,33 @@ mips_update_gba:
   restore_registers_0             # restore registers 1/2
   jr $ra                          # if not, go back to caller
   restore_registers_1             # restore registers 2/2 (delay)
+
+
+# Idle-loop fast path: REG_PC already valid; run update_gba then resume like lookup_pc.
+.balign 64
+idle_loop_enter_update_gba:
+  lw $2, REG_CPSR($16)            # load CPSR
+  sw $0, CHANGED_PC_STATUS($16)
+
+  addiu $sp, $sp, -4              # make room on the stack
+  sw $ra, ($sp)                   # save return address
+
+  save_registers                  # save registers
+  collapse_flags_body             # insert flag into $2
+
+  jal update_gba                  # process the next event
+  sw $2, REG_CPSR($16)            # store CPSR (delay)
+
+  lw $1, CHANGED_PC_STATUS($16)
+
+  lw $ra, ($sp)                   # restore return address
+  addiu $sp, $sp, 4               # fix the stack
+
+  bne $1, $0, lookup_pc_changed
+  addu $17, $2, $0                # $17 = new cycle count (delay slot)
+
+  j lookup_pc
+  nop
 
 
 branch_arm_update_gba:
