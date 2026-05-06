@@ -21,8 +21,8 @@
 #include "common.h"
 
 #define GPSP_CONFIG_FILENAME  "tempgba.cfg"
-#define GPSP_CONFIG_NUM         (17 + 16) // options + game pad config
-#define GPSP_CONFIG_NUM_LEGACY  (16 + 16) // before OAM hijack option
+#define GPSP_CONFIG_NUM         (18 + 16) // options + game pad config
+#define GPSP_CONFIG_NUM_LEGACY  (17 + 16) // before renderer option
 #define GPSP_GAME_CONFIG_NUM  (7 + 16)
 
 #define COLOR_BG            COLOR15( 3,  5,  8)
@@ -997,6 +997,12 @@ u32 menu(void)
     "PNG", "BMP"
   };
 
+  const char *video_renderer_options[] =
+  {
+    "Old",
+    "New"
+  };
+
   const char *gamepad_config_buttons[] =
   {
     MSG[MSG_PAD_MENU_CFG_0],
@@ -1248,6 +1254,7 @@ u32 menu(void)
 	option_sound_volume = 10;
 	option_stack_optimize = 1;
 	option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+	option_video_renderer = VIDEO_RENDERER_NEW;
 	option_oam_hijacking_enabled = 0;
 	option_boot_mode = 0;
 	option_update_backup = 1;		//auto
@@ -1521,9 +1528,11 @@ u32 menu(void)
 
     STRING_SELECTION_OPTION(NULL, "Screen capture : %s", image_format_options, &option_screen_capture_format, 2, MSG_MAIN_MENU_HELP_3, 4),
 
-    STRING_SELECTION_OPTION(NULL, "OAM hijack support: %s", on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 6),
+    STRING_SELECTION_OPTION(NULL, "Video renderer   : %s", video_renderer_options, &option_video_renderer, 2, MSG_OPTION_MENU_HELP_7, 6),
 
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 8)
+    STRING_SELECTION_OPTION(NULL, "OAM hijack support: %s", on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 7),
+
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 9)
   };
 
   MAKE_MENU(graphics, NULL, NULL);
@@ -2252,17 +2261,18 @@ s32 save_config_file(void)
     file_options[8]  = option_stack_optimize;
     /* Store mode with +4 marker so old 0/1 boolean configs can be migrated. */
     file_options[9]  = option_ram_dynarec_policy + 4;
-    file_options[10]  = option_oam_hijacking_enabled;
-    file_options[11]  = option_boot_mode;
-    file_options[12]  = option_update_backup;
-    file_options[13]  = option_screen_capture_format;
-    file_options[14]  = option_enable_analog;
-    file_options[15]  = option_analog_sensitivity;
-    file_options[16] = option_language;
+    file_options[10]  = option_video_renderer;
+    file_options[11]  = option_oam_hijacking_enabled;
+    file_options[12]  = option_boot_mode;
+    file_options[13]  = option_update_backup;
+    file_options[14]  = option_screen_capture_format;
+    file_options[15]  = option_enable_analog;
+    file_options[16]  = option_analog_sensitivity;
+    file_options[17] = option_language;
 
     for (i = 0; i < 16; i++)
     {
-      file_options[17 + i] = gamepad_config_map[i];
+      file_options[18 + i] = gamepad_config_map[i];
     }
 
     FILE_WRITE_ARRAY(config_file, file_options);
@@ -2394,17 +2404,18 @@ s32 load_config_file(void)
           option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
         }
       }
-      option_oam_hijacking_enabled = file_options[10] % 2;
-      option_boot_mode      = file_options[11] % 2;
-      option_update_backup  = file_options[12] % 2;
-      option_screen_capture_format = file_options[13] % 2;
-      option_enable_analog  = file_options[14] % 2;
-      option_analog_sensitivity = file_options[15] % 10;
-      option_language       = file_options[16] % 4;
+      option_video_renderer = file_options[10] % 2;
+      option_oam_hijacking_enabled = file_options[11] % 2;
+      option_boot_mode      = file_options[12] % 2;
+      option_update_backup  = file_options[13] % 2;
+      option_screen_capture_format = file_options[14] % 2;
+      option_enable_analog  = file_options[15] % 2;
+      option_analog_sensitivity = file_options[16] % 10;
+      option_language       = file_options[17] % 4;
 
       for (i = 0; i < 16; i++)
       {
-        gamepad_config_map[i] = file_options[17 + i] % (BUTTON_ID_NONE + 1);
+        gamepad_config_map[i] = file_options[18 + i] % (BUTTON_ID_NONE + 1);
 
         if (gamepad_config_map[i] == BUTTON_ID_MENU)
           menu_button = i;
@@ -2432,19 +2443,67 @@ s32 load_config_file(void)
       option_clock_speed     = file_options[6] % 4;
       option_sound_volume   = file_options[7] % 11;
       option_stack_optimize = file_options[8] % 2;
+      {
+        u32 stored_ram_dynarec_policy = file_options[9];
+        if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
+          option_ram_dynarec_policy = stored_ram_dynarec_policy - 4;
+        else if (stored_ram_dynarec_policy <= 1)
+          option_ram_dynarec_policy = stored_ram_dynarec_policy + 1;
+        else
+          option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+      }
+      option_video_renderer = VIDEO_RENDERER_NEW;
+      option_oam_hijacking_enabled = file_options[10] % 2;
+      option_boot_mode      = file_options[11] % 2;
+      option_update_backup  = file_options[12] % 2;
+      option_screen_capture_format = file_options[13] % 2;
+      option_enable_analog  = file_options[14] % 2;
+      option_analog_sensitivity = file_options[15] % 10;
+      option_language       = file_options[16] % 4;
+
+      for (i = 0; i < 16; i++)
+      {
+        gamepad_config_map[i] = file_options[17 + i] % (BUTTON_ID_NONE + 1);
+
+        if (gamepad_config_map[i] == BUTTON_ID_MENU)
+          menu_button = i;
+      }
+
+      if ((enable_home_menu == 0) && (menu_button == -1))
+        gamepad_config_map[0] = BUTTON_ID_MENU;
+
+      FILE_CLOSE(config_file);
+    }
+    else if (file_size == ((16 + 16) * 4))
+    {
+      u32 i;
+      u32 file_options[file_size / 4];
+      s32 menu_button = -1;
+
+      FILE_READ_ARRAY(config_file, file_options);
+
+      option_screen_scale   = file_options[0] % 5;
+      option_screen_mag     = file_options[1] % 201;
+      option_screen_filter  = file_options[2] % 2;
+      psp_fps_debug       = file_options[3] % 2;
+      option_frameskip_type  = file_options[4] % 3;
+      option_frameskip_value = file_options[5];
+      option_clock_speed     = file_options[6] % 4;
+      option_sound_volume   = file_options[7] % 11;
+      option_stack_optimize = file_options[8] % 2;
       option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+      option_video_renderer = VIDEO_RENDERER_NEW;
       option_oam_hijacking_enabled = 0;
       option_boot_mode      = file_options[9] % 2;
       option_update_backup  = file_options[10] % 2;
       option_screen_capture_format = file_options[11] % 2;
       option_enable_analog  = file_options[12] % 2;
       option_analog_sensitivity = file_options[13] % 10;
-      option_language       = file_options[15] % 4;
+      option_language       = file_options[14] % 4;
 
       for (i = 0; i < 16; i++)
       {
-        gamepad_config_map[i] = file_options[16 + i] % (BUTTON_ID_NONE + 1);
-
+        gamepad_config_map[i] = file_options[15 + i] % (BUTTON_ID_NONE + 1);
         if (gamepad_config_map[i] == BUTTON_ID_MENU)
           menu_button = i;
       }
@@ -2467,6 +2526,7 @@ s32 load_config_file(void)
   option_sound_volume = 10;
   option_stack_optimize = 1;
   option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+  option_video_renderer = VIDEO_RENDERER_NEW;
   option_oam_hijacking_enabled = 0;
   option_boot_mode = 0;
   option_update_backup = 1;		//auto

@@ -13,3 +13,7 @@ Based on phoe-nix' Github repo.
   -   ....and probably a few more!
 - Swapped X/O buttons around
 - Couple of minor fixes to make it work under PPSSPP (including w/ HW Rendering)
+
+## Building
+
+On Windows, use **Docker Desktop** and the PSPDev image; see **[BUILD-DOCKER.md](BUILD-DOCKER.md)** for the exact `docker run` command (mount `source/`, run `make`).

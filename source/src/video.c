@@ -2344,19 +2344,8 @@ extern void expand_blend_mips(u32 *screen_src_ptr, u16 *screen_dest_ptr, u32 sta
 static void expand_blend(u32 *screen_src_ptr, u16 *screen_dest_ptr, u32 start, u32 end, u16 bldcnt)
 {
 #ifdef __mips__
-  u16 bldalpha = pIO_REG(REG_BLDALPHA);
-  s32 blend_a = LIMIT_MAX((bldalpha & 0x1F), 16);
-  s32 blend_b = LIMIT_MAX(((bldalpha >> 8) & 0x1F), 16);
-
-  /* Keep parity with C path on the rare saturating blend case. */
-  if ((blend_a + blend_b) > 16)
-  {
-    expand_blend_c(screen_src_ptr, screen_dest_ptr, start, end, bldcnt);
-  }
-  else
-  {
-    expand_blend_mips(screen_src_ptr, screen_dest_ptr, start, end);
-  }
+  (void)bldcnt;
+  expand_blend_mips(screen_src_ptr, screen_dest_ptr, start, end);
 #else
   expand_blend_c(screen_src_ptr, screen_dest_ptr, start, end, bldcnt);
 #endif

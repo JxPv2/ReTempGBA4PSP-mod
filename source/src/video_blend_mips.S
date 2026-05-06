@@ -78,17 +78,23 @@ blend_loop:
   mflo   $t2
   addu   $t2, $t2, $t3
 
-  bne    $t7, $zero, blend_no_saturate
+  # Always >> 4 (matches C blend_pixel / blend_saturate_pixel).
+  srl    $t2, $t2, 4
+
+  # Saturation only when blend_a + blend_b > 16 (matches expand_blend_c).
+  bne    $t7, $zero, blend_pack
   nop
 
-  srl    $t2, $t2, 4
   and    $t3, $t2, $v1
-  beq    $t3, $zero, blend_no_saturate
+  beq    $t3, $zero, blend_pack
   nop
-  andi   $t6, $t3, 0x0020
+  # Same order as C blend_saturate_pixel: green, red, blue
+  lui    $t6, 0x0400             # 0x04000000
+  and    $t6, $t3, $t6
   beq    $t6, $zero, 3f
   nop
-  ori    $t2, $t2, 0x001F
+  lui    $t6, 0x03E0             # 0x03E00000
+  or     $t2, $t2, $t6
 3:
   li     $t6, 0x00008000
   and    $t6, $t3, $t6
@@ -97,14 +103,12 @@ blend_loop:
   li     $t6, 0x00007C00
   or     $t2, $t2, $t6
 4:
-  lui    $t6, 0x0400             # 0x04000000
-  and    $t6, $t3, $t6
-  beq    $t6, $zero, blend_no_saturate
+  andi   $t6, $t3, 0x0020
+  beq    $t6, $zero, blend_pack
   nop
-  lui    $t6, 0x03E0
-  or     $t2, $t2, $t6
+  ori    $t2, $t2, 0x001F
 
-blend_no_saturate:
+blend_pack:
   and    $t2, $t2, $v0
   srl    $t3, $t2, 16
   or     $t2, $t2, $t3

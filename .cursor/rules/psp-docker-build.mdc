@@ -1,0 +1,10 @@
+---
+description: Build TempGBA for PSP using Docker Desktop + pspdev image (not local Windows toolchain)
+alwaysApply: true
+---
+
+# PSP build on this machine
+
+- **Do not assume** `psp-gcc` / `psp-config` is installed on the Windows host.
+- **Build via Docker Desktop** using image `pspdev/pspdev:latest`, mounting **`source/`** as the workdir and running `make` there.
+- Full commands, paths, and notes: see **`BUILD-DOCKER.md`** at the repo root.

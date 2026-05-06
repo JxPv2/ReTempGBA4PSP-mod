@@ -53,6 +53,10 @@
 #define RAM_DYNAREC_PARTIAL_NO_REUSE   1
 #define RAM_DYNAREC_PARTIAL_WITH_REUSE 2
 
+// renderer option
+#define VIDEO_RENDERER_OLD 0
+#define VIDEO_RENDERER_NEW 1
+
 
 extern u32 option_screen_scale;
 extern u32 option_screen_mag;
@@ -60,6 +64,7 @@ extern u32 option_screen_filter;
 extern u32 option_sound_volume;
 extern u32 option_stack_optimize;
 extern u32 option_ram_dynarec_policy;
+extern u32 option_video_renderer;
 extern u32 option_oam_hijacking_enabled;
 extern u32 option_boot_mode;
 extern u32 option_update_backup;

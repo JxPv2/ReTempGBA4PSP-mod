@@ -25,8 +25,8 @@ COMMON_FILE = \
  ku_bridge.h exception.h ch_print.h
 
 MAINOBJS = \
- cpu.o memory.o video_cc.o psp_video.o input.o sound.o main.o message.o mh_print.o gui.o zip.o png.o \
- mips_stub.o \
+ cpu.o memory.o video_dispatch.o video_cc_wrap.o video_old_wrap.o psp_video.o input.o sound.o main.o message.o mh_print.o gui.o zip.o png.o \
+ mips_stub.o video_blend_mips.o \
  ku_bridge.o exception.o cheats.o ch_print.o
 
 OBJZ = adler32.o crc32.o deflate.o infback.o inffast.o inflate.o inftrees.o trees.o zutil.o
