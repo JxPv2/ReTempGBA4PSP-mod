@@ -30,7 +30,7 @@
     "Savestate details  [R]",
 
     // MSG_MAIN_MENU_3
-    "Screen capture : %s",
+    "Graphics options",
 
     // MSG_MAIN_MENU_4
     "Emulator options",
@@ -69,7 +69,7 @@
     "[O]:Sub menu   [R] :Shortcut key",
 
     // MSG_MAIN_MENU_HELP_3
-    "[O]:Save Image   [<] [>] :Select image format",
+    "[O]:Sub menu",
 
     // MSG_MAIN_MENU_HELP_4
     "[O]:Sub menu",
@@ -593,7 +593,7 @@
     "即时存档 " FONT_R_TRIGGER_GBK,
 
     // MSG_MAIN_MENU_3
-    "截图: %s",
+    "图形设定",
 
     // MSG_MAIN_MENU_4
     "模拟器设定",
@@ -632,7 +632,7 @@
     "○:子菜单  " FONT_R_TRIGGER_GBK ":快捷键",
 
     // MSG_MAIN_MENU_HELP_3
-    "○:保存图像  " FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":选择格式",
+    "○:子菜单",
 
     // MSG_MAIN_MENU_HELP_4
     "○:子菜单",
@@ -1156,7 +1156,7 @@
     "即時存檔 " FONT_R_TRIGGER_GBK,
 
     // MSG_MAIN_MENU_3
-    "截圖: %s",
+    "圖形設定",
 
     // MSG_MAIN_MENU_4
     "模擬器設定",
@@ -1195,7 +1195,7 @@
     "○:子菜單  " FONT_R_TRIGGER_GBK ":快捷鍵",
 
     // MSG_MAIN_MENU_HELP_3
-    "○:保存圖像  " FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":選擇格式",
+    "○:子菜單",
 
     // MSG_MAIN_MENU_HELP_4
     "○:子菜單",

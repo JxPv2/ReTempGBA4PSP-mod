@@ -1045,6 +1045,7 @@ u32 menu(void)
   auto void menu_load_file(void);
 
   auto void submenu_emulator(void);
+  auto void submenu_graphics(void);
   auto void submenu_gamepad(void);
   auto void submenu_analog(void);
   auto void submenu_savestate(void);
@@ -1344,6 +1345,11 @@ u32 menu(void)
     DRAW_TITLE_OPT_GBK(MSG_OPTION_MENU_TITLE);
   }
 
+  void submenu_graphics(void)
+  {
+    DRAW_TITLE_OPT_GBK(MSG_MAIN_MENU_3);
+  }
+
 
   void submenu_cheats_misc(void)
   {
@@ -1503,7 +1509,7 @@ u32 menu(void)
 
 
   // Marker for help information, don't go past this mark (except \n)------*
-  MenuOptionType emulator_options[] =
+  MenuOptionType graphics_options[] =
   {
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_0], scale_options, &option_screen_scale, 5, MSG_OPTION_MENU_HELP_0, 0),
 
@@ -1513,6 +1519,17 @@ u32 menu(void)
 
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_SHOW_FPS], on_off_options, &psp_fps_debug, 2, MSG_OPTION_MENU_HELP_SHOW_FPS, 3),
 
+    STRING_SELECTION_OPTION(NULL, "Screen capture : %s", image_format_options, &option_screen_capture_format, 2, MSG_MAIN_MENU_HELP_3, 4),
+
+    STRING_SELECTION_OPTION(NULL, "OAM hijack support: %s", on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 6),
+
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 8)
+  };
+
+  MAKE_MENU(graphics, NULL, NULL);
+
+  MenuOptionType emulator_options[] =
+  {
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_3], frameskip_options, &option_frameskip_type, 3, MSG_OPTION_MENU_HELP_3, 5),
 
     NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_4], &option_frameskip_value, 10, MSG_OPTION_MENU_HELP_4, 6),
@@ -1523,19 +1540,17 @@ u32 menu(void)
 
     STRING_SELECTION_OPTION(menu_passive_ram_dynarec_policy, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], ram_dynarec_options, &option_ram_dynarec_policy, 3, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 9),
 
-    STRING_SELECTION_OPTION(NULL, "OAM hijack support: %s", on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 10),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 10),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 11),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 11),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 12),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 12), 
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 13), 
+    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 13), 
 
-    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 15), 
+    ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 15),
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 17),
-
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 18)
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 16)
   };
 
   MAKE_MENU(emulator, NULL, NULL);
@@ -1625,7 +1640,7 @@ u32 menu(void)
 
     ACTION_SUBMENU_OPTION(&savestate_menu, NULL, MSG[MSG_MAIN_MENU_2], MSG_MAIN_MENU_HELP_2, 2),
 
-    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_3], image_format_options, &option_screen_capture_format, 2, MSG_MAIN_MENU_HELP_3, 4),
+    SUBMENU_OPTION(&graphics_menu, MSG[MSG_MAIN_MENU_3], MSG_MAIN_MENU_HELP_3, 4),
 
     SUBMENU_OPTION(&emulator_menu, MSG[MSG_MAIN_MENU_4], MSG_MAIN_MENU_HELP_4, 6), 
 
