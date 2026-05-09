@@ -39,7 +39,6 @@ u32 option_sound_volume = 10;
 u32 option_stack_optimize = 1;
 u32 option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
 u32 option_video_renderer = VIDEO_RENDERER_NEW;
-u32 option_idle_loop_optimize = 0;
 u32 option_oam_hijacking_enabled = 0;
 u32 option_boot_mode = 0;
 u32 option_update_backup = 0;
@@ -51,6 +50,10 @@ u32 option_language = 0;
 u32 option_frameskip_type = FRAMESKIP_AUTO;
 u32 option_frameskip_value = 9;
 u32 option_clock_speed = PSP_CLOCK_333;
+
+u32 option_hblank_irq_cap = 16;
+
+static u32 hblank_irq_raised_count;
 
 char main_path[MAX_PATH];
 
@@ -358,7 +361,13 @@ u32 update_gba(void)
         // H-blank interrupts do occur during v-blank (unlike hdma, which does not)
         if ((dispstat & 0x10) != 0)
         {
-          irq_raised |= IRQ_HBLANK;
+          if (option_hblank_irq_cap == 0 ||
+              hblank_irq_raised_count < option_hblank_irq_cap)
+          {
+            irq_raised |= IRQ_HBLANK;
+            if (option_hblank_irq_cap != 0)
+              hblank_irq_raised_count++;
+          }
         }
       }
       else
@@ -421,6 +430,9 @@ u32 update_gba(void)
             flip_screen(0);
 
           vcount = 0;
+
+          if (option_hblank_irq_cap != 0)
+            hblank_irq_raised_count = 0;
         }
 
         if (vcount == (dispstat >> 8))
@@ -657,6 +669,8 @@ static void init_main(void)
 
   irq_ticks = 0;
   cpu_init_state = 0;
+
+  hblank_irq_raised_count = 0;
 
   if (!caches_inited)
   {

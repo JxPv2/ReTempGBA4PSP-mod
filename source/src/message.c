@@ -216,11 +216,11 @@ const char *message[4][MSG_END] =
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     "\x81\xA8\x81\xA9" ":?I??   ?G?~?????[?^",
 
-    // MSG_IDLE_LOOP_OPTIMIZE
-    "Idle loop optimize: %s",
+    // MSG_OPTION_MENU_HBLANK_IRQ_CAP
+    "HBLANK IRQ cap   : %d",
 
-    // MSG_IDLE_LOOP_OPTIMIZE_HELP
-    "\x81\xA8\x81\xA9" ":?I??   ?G?~?????[?^",
+    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
+    "[<] [>] :Select   0=off, unsafe diagnostic",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-4s %2d:%02d:%02d",

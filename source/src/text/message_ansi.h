@@ -191,11 +191,11 @@
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     "[<] [>] :Select   emulator",
 
-    // MSG_IDLE_LOOP_OPTIMIZE
-    "Idle loop optimize : %s",
+    // MSG_OPTION_MENU_HBLANK_IRQ_CAP
+    "HBLANK IRQ cap   : %d",
 
-    // MSG_IDLE_LOOP_OPTIMIZE_HELP
-    "Skip tight Thumb wait loops (may affect timing).",
+    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
+    "[<] [>] :Select   0=off (unsafe diagnostic)",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-3s %2d:%02d:%02d",
@@ -760,11 +760,11 @@
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":选择   模拟器配置",
 
-    // MSG_IDLE_LOOP_OPTIMIZE
-    "空闲循环优化: %s",
+    // MSG_OPTION_MENU_HBLANK_IRQ_CAP
+    "HBLANK IRQ cap   : %d",
 
-    // MSG_IDLE_LOOP_OPTIMIZE_HELP
-    "跳过紧凑Thumb等待循环（可能影响时序）。",
+    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
+    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":选择   0=关闭（诊断，非精确）",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%02d/%02d %-4s %2d:%02d:%02d",
@@ -1329,11 +1329,11 @@
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":選擇   模擬器配置",
 
-    // MSG_IDLE_LOOP_OPTIMIZE
-    "空閒循環優化: %s",
+    // MSG_OPTION_MENU_HBLANK_IRQ_CAP
+    "HBLANK IRQ cap   : %d",
 
-    // MSG_IDLE_LOOP_OPTIMIZE_HELP
-    "跳過緊湊Thumb等待循環（可能影響時序）。",
+    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
+    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":選擇   0=關閉（診斷，非精確）",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-4s %2d:%02d:%02d",

@@ -11,10 +11,6 @@ extern void (*update_screen_old)(void);
 extern void (*update_screen_new)(void);
 extern u16 *screen_texture_old;
 extern u16 *screen_texture_new;
-extern s32 affine_reference_x_old[2];
-extern s32 affine_reference_y_old[2];
-extern s32 affine_reference_x_new[2];
-extern s32 affine_reference_y_new[2];
 
 void (*update_screen)(void);
 u16 *screen_texture = (u16 *)(0x4000000 + (PSP_FRAME_SIZE * 2));

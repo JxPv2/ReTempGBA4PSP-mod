@@ -173,8 +173,8 @@ typedef enum
   PIXCOPY     // Special mode used for sprites, to allow for obj-window drawing
 } rendtype;
 
-s32 affine_reference_x[2];
-s32 affine_reference_y[2];
+extern "C" s32 affine_reference_x[2];
+extern "C" s32 affine_reference_y[2];
 
 static inline s32 signext28(u32 value)
 {

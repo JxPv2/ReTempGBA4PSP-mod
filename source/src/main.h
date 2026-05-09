@@ -65,7 +65,6 @@ extern u32 option_sound_volume;
 extern u32 option_stack_optimize;
 extern u32 option_ram_dynarec_policy;
 extern u32 option_video_renderer;
-extern u32 option_idle_loop_optimize;
 extern u32 option_oam_hijacking_enabled;
 extern u32 option_boot_mode;
 extern u32 option_update_backup;
@@ -77,6 +76,9 @@ extern u32 option_language;
 extern u32 option_frameskip_type;
 extern u32 option_frameskip_value;
 extern u32 option_clock_speed;
+
+/* Max HBLANK IRQ edges ORed into REG_IF per frame (0-160, 0 = off). Emulator option. */
+extern u32 option_hblank_irq_cap;
 
 extern char main_path[MAX_PATH];
 

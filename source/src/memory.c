@@ -3243,8 +3243,6 @@ static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamep
   for (i = 0; i < MAX_IDLE_LOOPS; i++)
     idle_loop_target_pc[i] = 0xFFFFFFFF;
 
-  cpu_auto_idle_loop_reset();
-
   iwram_stack_optimize = 1;
 
   bios.rom[0x39] = 0x00;

@@ -195,9 +195,6 @@ extern u32 spsr[7];
 
 void init_cpu(void);
 
-void cpu_auto_idle_loop_reset(void);
-u8 *cpu_idle_loop_on_block_lookup(u32 pc, u32 is_thumb);
-
 void cpu_write_mem_savestate(SceUID savestate_file);
 void cpu_read_savestate(SceUID savestate_file);
 

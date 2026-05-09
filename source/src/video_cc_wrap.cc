@@ -4,8 +4,6 @@
 #define video_reload_counters video_reload_counters_new
 #define update_screen update_screen_new
 #define screen_texture screen_texture_new
-#define affine_reference_x affine_reference_x_new
-#define affine_reference_y affine_reference_y_new
 #define obj_priority_list obj_priority_list_new
 #define obj_priority_count obj_priority_count_new
 #define obj_alpha_count obj_alpha_count_new

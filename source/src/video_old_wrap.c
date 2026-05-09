@@ -4,8 +4,6 @@
 #define video_reload_counters video_reload_counters_old
 #define update_screen update_screen_old
 #define screen_texture screen_texture_old
-#define affine_reference_x affine_reference_x_old
-#define affine_reference_y affine_reference_y_old
 #define map_widths map_widths_old
 #define obj_width_table obj_width_table_old
 #define obj_height_table obj_height_table_old

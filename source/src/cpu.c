@@ -2716,13 +2716,8 @@ static void thumb_flag_status(BlockDataThumbType *block_data, u16 opcode)
   u16 *location;                                                              \
   u32 block_tag;                                                              \
   u8 *block_address;                                                          \
-  u8 *idle_tramp;                                                             \
                                                                               \
   block_lookup_address_pc_##type();                                           \
-                                                                              \
-  idle_tramp = cpu_idle_loop_on_block_lookup(pc, thumb);                      \
-  if (idle_tramp != NULL)                                                     \
-    return idle_tramp;                                                        \
                                                                               \
   switch (pc >> 24)                                                           \
   {                                                                           \
@@ -3219,6 +3214,24 @@ static s32 BinarySearch(u32 *Array, u32 Value, s32 Size)
     return -1;
 }
 
+static inline u32 is_m4a_ram_smc_gate(u32 pc)
+{
+  switch (pc & ~3u)
+  {
+    case 0x030061DC: // writer start
+    case 0x0300620C: // after writer sequence
+    case 0x0300621C: // cluster 1 start
+    case 0x03006238: // after cluster 1
+    case 0x030062B4: // cluster 2 start
+    case 0x030062D0: // after cluster 2
+    case 0x03005F50: // optionals
+    case 0x03006A74: // optionals
+    case 0x03006FF0: // optionals
+      return 1;
+  }
+  return 0;
+}
+
 #define scan_block(type, smc_write_op)                                        \
 {                                                                             \
   u8 continue_block = 1;                                                      \
@@ -3287,7 +3300,14 @@ static s32 BinarySearch(u32 *Array, u32 Value, s32 Size)
           unconditional_branch_write_##type##_##smc_write_op();               \
         }                                                                     \
       }                                                                       \
-                                                                              \
+      if (translation_region == TRANSLATION_REGION_WRITABLE &&                \
+          type##_instruction_width == arm_instruction_width &&                \
+          is_m4a_ram_smc_gate(block_end_pc))                                 \
+      {                                                                       \
+        translation_gate_required = 1;                                        \
+        continue_block = 0;                                                   \
+        unconditional_branch_write_##type##_##smc_write_op();               \
+      }                                                                       \
       if (block_exit_position == MAX_EXITS)                                   \
       {                                                                       \
         translation_gate_required = 1;                                        \
@@ -4047,8 +4067,6 @@ void init_cpu(void)
 
   reg[CPU_HALT_STATE] = CPU_ACTIVE;
   reg[CHANGED_PC_STATUS] = 0;
-
-  cpu_auto_idle_loop_reset();
 }
 
 
@@ -4060,7 +4078,6 @@ void init_cpu(void)
 void cpu_read_savestate(SceUID savestate_file)
 {
   CPU_SAVESTATE_BODY(READ);
-  cpu_auto_idle_loop_reset();
 }
 
 void cpu_write_mem_savestate(SceUID savestate_file)

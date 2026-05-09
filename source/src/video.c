@@ -36,8 +36,8 @@ void (*update_screen)(void);
 #define WINDOW_INSIDE  0x8000
 
 
-s32 ALIGN_DATA affine_reference_x[2];
-s32 ALIGN_DATA affine_reference_y[2];
+extern s32 affine_reference_x[2];
+extern s32 affine_reference_y[2];
 
 
 u16 *screen_texture = (u16 *)(0x4000000 + (PSP_FRAME_SIZE * 2));
