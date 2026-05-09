@@ -3214,6 +3214,27 @@ static s32 BinarySearch(u32 *Array, u32 Value, s32 Size)
     return -1;
 }
 
+static u32 gamepak_filename_has_pokemon_unbound(void)
+{
+  static const char needle[] = "pokemon unbound";
+  const char *s;
+  u32 k;
+
+  for (s = gamepak_filename; *s; s++)
+  {
+    for (k = 0; needle[k]; k++)
+    {
+      if (!s[k])
+        return 0;
+      if (tolower((u8)s[k]) != (u8)needle[k])
+        break;
+    }
+    if (needle[k] == 0)
+      return 1;
+  }
+  return 0;
+}
+
 static inline u32 is_m4a_ram_smc_gate(u32 pc)
 {
   switch (pc & ~3u)
@@ -3302,6 +3323,7 @@ static inline u32 is_m4a_ram_smc_gate(u32 pc)
       }                                                                       \
       if (translation_region == TRANSLATION_REGION_WRITABLE &&                \
           type##_instruction_width == arm_instruction_width &&                \
+          gamepak_filename_has_pokemon_unbound() &&                           \
           is_m4a_ram_smc_gate(block_end_pc))                                 \
       {                                                                       \
         translation_gate_required = 1;                                        \
