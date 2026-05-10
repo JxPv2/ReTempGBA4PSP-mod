@@ -38,8 +38,9 @@ extern u32 option_oam_hijacking_enabled;  // Emulator option for OAM hijacking
 #define REG_BGxCNT(layer) (REG_BG0CNT + (layer))
 #define REG_BGxHOFS(layer) (REG_BG0HOFS + ((layer) * 2))
 #define REG_BGxVOFS(layer) (REG_BG0VOFS + ((layer) * 2))
-#define REG_BGxPA(layer) (REG_BG2PA + (((layer) - 2) * 4))
-#define REG_BGxPC(layer) (REG_BG2PC + (((layer) - 2) * 4))
+/* BG3 PA/PC are 8 halfwords after BG2 (PA-PB-PC-PD, BG2X, BG2Y), not 4. */
+#define REG_BGxPA(layer) (REG_BG2PA + (((layer) - 2) * 8))
+#define REG_BGxPC(layer) (REG_BG2PC + (((layer) - 2) * 8))
 #define REG_WINxH(n) (REG_WIN0H + (n))
 #define REG_WINxV(n) (REG_WIN0V + (n))
 #endif

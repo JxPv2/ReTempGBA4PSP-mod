@@ -51,9 +51,9 @@ u32 option_frameskip_type = FRAMESKIP_AUTO;
 u32 option_frameskip_value = 9;
 u32 option_clock_speed = PSP_CLOCK_333;
 
-u32 option_hblank_irq_cap = 16;
+u32 option_hblank_irq_cap = 0;
 
-static u32 hblank_irq_raised_count;
+static u32 hblank_irq_stride_phase;
 
 char main_path[MAX_PATH];
 
@@ -361,13 +361,11 @@ u32 update_gba(void)
         // H-blank interrupts do occur during v-blank (unlike hdma, which does not)
         if ((dispstat & 0x10) != 0)
         {
-          if (option_hblank_irq_cap == 0 ||
-              hblank_irq_raised_count < option_hblank_irq_cap)
-          {
+          u32 stride = option_hblank_irq_cap;
+
+          if (stride < 2 ||
+              (vcount % stride) == (hblank_irq_stride_phase % stride))
             irq_raised |= IRQ_HBLANK;
-            if (option_hblank_irq_cap != 0)
-              hblank_irq_raised_count++;
-          }
         }
       }
       else
@@ -431,8 +429,9 @@ u32 update_gba(void)
 
           vcount = 0;
 
-          if (option_hblank_irq_cap != 0)
-            hblank_irq_raised_count = 0;
+          if (option_hblank_irq_cap >= 2)
+            hblank_irq_stride_phase =
+              (hblank_irq_stride_phase + 1) % option_hblank_irq_cap;
         }
 
         if (vcount == (dispstat >> 8))
@@ -670,7 +669,7 @@ static void init_main(void)
   irq_ticks = 0;
   cpu_init_state = 0;
 
-  hblank_irq_raised_count = 0;
+  hblank_irq_stride_phase = 0;
 
   if (!caches_inited)
   {
