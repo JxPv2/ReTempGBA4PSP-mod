@@ -176,12 +176,19 @@ u8 *block_lookup_address_thumb(u32 pc);
 u8 *block_lookup_address_dual(u32 pc);
 
 
-#define MAX_IDLE_LOOPS 8
+#define MAX_IDLE_LOOPS 16
 
 extern s32 idle_loop_targets;
 extern u32 idle_loop_target_pc[MAX_IDLE_LOOPS];
 
+#define MAX_SMC_GATES 16
+
+extern s32 smc_gate_targets;
+extern u32 smc_gate_pc[MAX_SMC_GATES];
+
 extern u32 iwram_stack_optimize;
+
+void add_smc_gate(u32 pc);
 
 void partial_clear_metadata(u32 offset, u8 region);
 void flush_translation_cache(TRANSLATION_REGION_TYPE translation_region, CACHE_FLUSH_REASON_TYPE flush_reason);

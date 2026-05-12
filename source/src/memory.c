@@ -3253,6 +3253,8 @@ static void reset_game_config_options(void)
   for (i = 0; i < MAX_IDLE_LOOPS; i++)
     idle_loop_target_pc[i] = 0xFFFFFFFF;
 
+  smc_gate_targets = 0;
+
   iwram_stack_optimize = 1;
 
   bios.rom[0x39] = 0x00;
@@ -3268,6 +3270,11 @@ static void apply_game_config_option(const char *current_variable, const char *c
       idle_loop_target_pc[idle_loop_targets] = strtol(current_value, NULL, 16);
       idle_loop_targets++;
     }
+  }
+
+  if (!strcasecmp(current_variable, "smc_gate"))
+  {
+    add_smc_gate(strtol(current_value, NULL, 16));
   }
 
   if (!strcasecmp(current_variable, "iwram_stack_optimize") &&
