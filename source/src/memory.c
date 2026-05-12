@@ -3194,6 +3194,22 @@ static char *skip_spaces(char *line_ptr)
   return line_ptr;
 }
 
+static s32 filename_contains_string(const char *filename, const char *value)
+{
+  size_t value_len = strlen(value);
+
+  if (value_len == 0)
+    return 1;
+
+  for (; *filename; filename++)
+  {
+    if (strncasecmp(filename, value, value_len) == 0)
+      return 1;
+  }
+
+  return 0;
+}
+
 
 s32 parse_config_line(char *current_line, char *current_variable, char *current_value)
 {
@@ -3229,14 +3245,8 @@ s32 parse_config_line(char *current_line, char *current_variable, char *current_
   return 0;
 }
 
-static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_maker)
+static void reset_game_config_options(void)
 {
-  char current_line[256];
-  char current_variable[256];
-  char current_value[256];
-  char config_path[MAX_PATH];
-  FILE *config_file;
-
   u32 i;
 
   idle_loop_targets = 0;
@@ -3247,6 +3257,47 @@ static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamep
 
   bios.rom[0x39] = 0x00;
   bios.rom[0x2C] = 0x00;
+}
+
+static void apply_game_config_option(const char *current_variable, const char *current_value)
+{
+  if (!strcasecmp(current_variable, "idle_loop_eliminate_target"))
+  {
+    if (idle_loop_targets < MAX_IDLE_LOOPS)
+    {
+      idle_loop_target_pc[idle_loop_targets] = strtol(current_value, NULL, 16);
+      idle_loop_targets++;
+    }
+  }
+
+  if (!strcasecmp(current_variable, "iwram_stack_optimize") &&
+      !strcasecmp(current_value, "no"))
+  {
+    iwram_stack_optimize = 0;
+  }
+
+  if (!strcasecmp(current_variable, "bios_rom_hack_39") &&
+      !strcasecmp(current_value, "yes"))
+  {
+    bios.rom[0x39] = 0xC0;
+  }
+
+  if (!strcasecmp(current_variable, "bios_rom_hack_2C") &&
+      !strcasecmp(current_value, "yes"))
+  {
+    bios.rom[0x2C] = 0x02;
+  }
+}
+
+static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_maker)
+{
+  char current_line[256];
+  char current_variable[256];
+  char current_value[256];
+  char config_path[MAX_PATH];
+  FILE *config_file;
+
+  reset_game_config_options();
 
   //translation_gate_targets = 0;
 /*fix no game_code*/
@@ -3261,90 +3312,75 @@ static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamep
   {
     while (fgets(current_line, 256, config_file))
     {
-      if (parse_config_line(current_line, current_variable, current_value) != -1)
+resume_after_entry:
+      if (parse_config_line(current_line, current_variable, current_value) == -1)
+        continue;
+
+      if (strcasecmp(current_variable, "game_name") ||
+          strcasecmp(current_value, gamepak_title))
       {
-        if (strcasecmp(current_variable, "game_name") ||
-            strcasecmp(current_value, gamepak_title))
-        {
-          continue;
-        }
-        if (!fgets(current_line, 256, config_file) ||
-            (parse_config_line(current_line, current_variable, current_value) == -1) ||
-            strcasecmp(current_variable, "game_code") ||
-            strcasecmp(current_value, gamepak_code))
-        {
-          continue;
-        }
-        if (!fgets(current_line, 256, config_file) ||
-            (parse_config_line(current_line, current_variable, current_value) == -1) ||
-            strcasecmp(current_variable, "vender_code") ||
-            strcasecmp(current_value, gamepak_maker))
-        {
-          continue;
-        }
+        continue;
+      }
+      if (!fgets(current_line, 256, config_file) ||
+          (parse_config_line(current_line, current_variable, current_value) == -1) ||
+          strcasecmp(current_variable, "game_code") ||
+          strcasecmp(current_value, gamepak_code))
+      {
+        continue;
+      }
+      if (!fgets(current_line, 256, config_file) ||
+          (parse_config_line(current_line, current_variable, current_value) == -1) ||
+          strcasecmp(current_variable, "vender_code") ||
+          strcasecmp(current_value, gamepak_maker))
+      {
+        continue;
+      }
 
-        while (fgets(current_line, 256, config_file))
+      if (fgets(current_line, 256, config_file) &&
+          (parse_config_line(current_line, current_variable, current_value) != -1))
+      {
+        if (!strcasecmp(current_variable, "filename_match"))
         {
-          if (parse_config_line(current_line, current_variable, current_value) != -1)
+          if (!filename_contains_string(gamepak_filename, current_value))
           {
-            if (!strcasecmp(current_variable, "game_name"))
+            while (fgets(current_line, 256, config_file))
             {
-              fclose(config_file);
-              return 0;
-            }
-
-            if (!strcasecmp(current_variable, "idle_loop_eliminate_target"))
-            {
-              if (idle_loop_targets < MAX_IDLE_LOOPS)
+              if (parse_config_line(current_line, current_variable, current_value) != -1 &&
+                  !strcasecmp(current_variable, "game_name"))
               {
-                idle_loop_target_pc[idle_loop_targets] = strtol(current_value, NULL, 16);
-                idle_loop_targets++;
+                goto resume_after_entry;
               }
             }
-
-            if (!strcasecmp(current_variable, "iwram_stack_optimize") &&
-                !strcasecmp(current_value, "no"))
-            {
-              iwram_stack_optimize = 0;
-            }
-/*
-            if (!strcasecmp(current_variable, "flash_rom_type") && !strcasecmp(current_value, "128KB"))
-            {
-              flash_device_id = FLASH_DEVICE_MACRONIX_128KB;
-            }
-
-            // DBZLGCYGOKU2 �Υץ��ƥ��Ȼر�
-            // EEPROM_V124���������(�F���Єe����) ��ָ������Є�����
-            if (!strcasecmp(current_variable, "save_type"))
-            {
-              if (!strcasecmp(current_value, "sram"))
-                backup_type = BACKUP_SRAM;
-              else
-              if (!strcasecmp(current_value, "flash"))
-                backup_type = BACKUP_FLASH;
-              else
-              if (!strcasecmp(current_value, "eeprom"))
-                backup_type = BACKUP_EEPROM;
-            }
-*/
-            if (!strcasecmp(current_variable, "bios_rom_hack_39") &&
-                !strcasecmp(current_value, "yes"))
-            {
-              bios.rom[0x39] = 0xC0;
-            }
-
-            if (!strcasecmp(current_variable, "bios_rom_hack_2C") &&
-                !strcasecmp(current_value, "yes"))
-            {
-               bios.rom[0x2C] = 0x02;
-            }
+            break;
           }
         }
-
-        fclose(config_file);
-
-        return 0;
+        else
+        if (!strcasecmp(current_variable, "game_name"))
+        {
+          goto resume_after_entry;
+        }
+        else
+        {
+          apply_game_config_option(current_variable, current_value);
+        }
       }
+
+      while (fgets(current_line, 256, config_file))
+      {
+        if (parse_config_line(current_line, current_variable, current_value) != -1)
+        {
+          if (!strcasecmp(current_variable, "game_name"))
+          {
+            fclose(config_file);
+            return 0;
+          }
+
+          apply_game_config_option(current_variable, current_value);
+        }
+      }
+
+      fclose(config_file);
+      return 0;
     }
 
     fclose(config_file);
