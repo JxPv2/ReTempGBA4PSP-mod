@@ -264,7 +264,6 @@ static CPU_ALERT_TYPE sio_control(u32 value);
 
 static void waitstate_control(u32 value);
 
-static char *skip_spaces(char *line_ptr);
 static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_maker);
 
 char gamepak_filename[MAX_FILE];
@@ -3186,14 +3185,6 @@ void update_backup_immediately(void)
 }
 
 
-static char *skip_spaces(char *line_ptr)
-{
-  while (*line_ptr == ' ')
-    line_ptr++;
-
-  return line_ptr;
-}
-
 static s32 filename_contains_string(const char *filename, const char *value)
 {
   size_t value_len = strlen(value);
@@ -3213,34 +3204,63 @@ static s32 filename_contains_string(const char *filename, const char *value)
 
 s32 parse_config_line(char *current_line, char *current_variable, char *current_value)
 {
-  char *line_ptr = current_line;
-  char *line_ptr_new;
+  char *eq;
+  char *ks;
+  char *ke;
+  char *vs;
+  char *ve;
+  size_t klen;
+  size_t vlen;
 
-  if ((current_line[0] == 0) || (current_line[0] == '#'))
+  if (current_line == NULL || current_line[0] == 0 || current_line[0] == '#' ||
+      current_line[0] == '\r' || current_line[0] == '\n')
     return -1;
 
-  line_ptr_new = strchr(line_ptr, ' ');
-  if (line_ptr_new == NULL)
+  eq = strchr(current_line, '=');
+  if (eq == NULL)
     return -1;
 
-  *line_ptr_new = 0;
-  strcpy(current_variable, line_ptr);
-  line_ptr_new = skip_spaces(line_ptr_new + 1);
+  /* Do not write *eq = 0: load_game_config may re-parse current_line after
+   * reading a block (goto resume_after_entry). Nul at '=' breaks the next parse. */
 
-  if (*line_ptr_new != '=')
+  ks = current_line;
+  while (*ks == ' ' || *ks == '\t')
+    ks++;
+
+  ke = eq - 1;
+  while (ke >= ks && (*ke == ' ' || *ke == '\t'))
+    ke--;
+
+  if (ke < ks)
     return -1;
 
-  line_ptr_new = skip_spaces(line_ptr_new + 1);
-  strcpy(current_value, line_ptr_new);
-  line_ptr_new = current_value + strlen(current_value) - 1;
-  if (*line_ptr_new == '\n')
+  klen = (size_t)(ke - ks + 1);
+  if (klen >= 256)
+    return -1;
+
+  memcpy(current_variable, ks, klen);
+  current_variable[klen] = 0;
+
+  vs = eq + 1;
+  while (*vs == ' ' || *vs == '\t')
+    vs++;
+
+  ve = vs + strlen(vs);
+  while (ve > vs)
   {
-    line_ptr_new--;
-    *line_ptr_new = 0;
+    ve--;
+    if (*ve == '\n' || *ve == '\r' || *ve == ' ' || *ve == '\t')
+      continue;
+    ve++;
+    break;
   }
 
-  if (*line_ptr_new == '\r')
-    *line_ptr_new = 0;
+  vlen = (size_t)(ve - vs);
+  if (vlen >= 255)
+    vlen = 254;
+
+  memcpy(current_value, vs, vlen);
+  current_value[vlen] = 0;
 
   return 0;
 }
@@ -3267,14 +3287,15 @@ static void apply_game_config_option(const char *current_variable, const char *c
   {
     if (idle_loop_targets < MAX_IDLE_LOOPS)
     {
-      idle_loop_target_pc[idle_loop_targets] = strtol(current_value, NULL, 16);
+      idle_loop_target_pc[idle_loop_targets] = (u32)strtoul(current_value, NULL, 16);
       idle_loop_targets++;
     }
   }
 
-  if (!strcasecmp(current_variable, "smc_gate"))
+  if (!strcasecmp(current_variable, "smc_gate") ||
+      !strcasecmp(current_variable, "smc_cutpoint"))
   {
-    add_smc_gate(strtol(current_value, NULL, 16));
+    add_smc_gate((u32)strtoul(current_value, NULL, 16));
   }
 
   if (!strcasecmp(current_variable, "iwram_stack_optimize") &&
@@ -3296,6 +3317,24 @@ static void apply_game_config_option(const char *current_variable, const char *c
   }
 }
 
+/* After game_name matched ROM title, if game_code or maker line fails, skip to
+ * the next game_name= line. Otherwise the file pointer sits inside a block and
+ * idle_loop / smc_* lines are mis-parsed as new headers. */
+static s32 skip_config_to_next_game_name(FILE *config_file, char *current_line,
+    char *current_variable, char *current_value)
+{
+  while (fgets(current_line, 256, config_file))
+  {
+    if (parse_config_line(current_line, current_variable, current_value) == -1)
+      continue;
+
+    if (!strcasecmp(current_variable, "game_name"))
+      return 1;
+  }
+
+  return 0;
+}
+
 static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamepak_maker)
 {
   char current_line[256];
@@ -3303,6 +3342,12 @@ static s32 load_game_config(char *gamepak_title, char *gamepak_code, char *gamep
   char current_value[256];
   char config_path[MAX_PATH];
   FILE *config_file;
+
+  char blk_var[128][64];
+  char blk_val[128][256];
+  u32 blk_n;
+  u32 blk_i;
+  u32 filename_ok;
 
   reset_game_config_options();
 
@@ -3333,57 +3378,72 @@ resume_after_entry:
           strcasecmp(current_variable, "game_code") ||
           strcasecmp(current_value, gamepak_code))
       {
-        continue;
+        if (!skip_config_to_next_game_name(config_file, current_line, current_variable, current_value))
+          break;
+
+        goto resume_after_entry;
       }
       if (!fgets(current_line, 256, config_file) ||
           (parse_config_line(current_line, current_variable, current_value) == -1) ||
-          strcasecmp(current_variable, "vender_code") ||
+          (strcasecmp(current_variable, "vender_code") &&
+           strcasecmp(current_variable, "vendor_code")) ||
           strcasecmp(current_value, gamepak_maker))
       {
-        continue;
+        if (!skip_config_to_next_game_name(config_file, current_line, current_variable, current_value))
+          break;
+
+        goto resume_after_entry;
       }
 
-      if (fgets(current_line, 256, config_file) &&
-          (parse_config_line(current_line, current_variable, current_value) != -1))
+      blk_n = 0;
       {
-        if (!strcasecmp(current_variable, "filename_match"))
-        {
-          if (!filename_contains_string(gamepak_filename, current_value))
-          {
-            while (fgets(current_line, 256, config_file))
-            {
-              if (parse_config_line(current_line, current_variable, current_value) != -1 &&
-                  !strcasecmp(current_variable, "game_name"))
-              {
-                goto resume_after_entry;
-              }
-            }
-            break;
-          }
-        }
-        else
-        if (!strcasecmp(current_variable, "game_name"))
-        {
-          goto resume_after_entry;
-        }
-        else
-        {
-          apply_game_config_option(current_variable, current_value);
-        }
-      }
+        u32 block_ends_with_game_name = 0;
 
-      while (fgets(current_line, 256, config_file))
-      {
-        if (parse_config_line(current_line, current_variable, current_value) != -1)
+        while (fgets(current_line, 256, config_file))
         {
+          if (parse_config_line(current_line, current_variable, current_value) == -1)
+            continue;
+
           if (!strcasecmp(current_variable, "game_name"))
           {
-            fclose(config_file);
-            return 0;
+            block_ends_with_game_name = 1;
+            break;
           }
 
-          apply_game_config_option(current_variable, current_value);
+          if (blk_n < 128u)
+          {
+            strncpy(blk_var[blk_n], current_variable, 63);
+            blk_var[blk_n][63] = 0;
+            strncpy(blk_val[blk_n], current_value, 255);
+            blk_val[blk_n][255] = 0;
+            blk_n++;
+          }
         }
+
+        filename_ok = 1;
+
+        for (blk_i = 0; blk_i < blk_n; blk_i++)
+        {
+          if (!strcasecmp(blk_var[blk_i], "filename_match"))
+          {
+            if (!filename_contains_string(gamepak_filename, blk_val[blk_i]))
+              filename_ok = 0;
+          }
+        }
+
+        if (filename_ok)
+        {
+          for (blk_i = 0; blk_i < blk_n; blk_i++)
+          {
+            if (strcasecmp(blk_var[blk_i], "filename_match"))
+              apply_game_config_option(blk_var[blk_i], blk_val[blk_i]);
+          }
+          fclose(config_file);
+          return 0;
+        }
+
+        if (block_ends_with_game_name)
+          goto resume_after_entry;
       }
 
       fclose(config_file);

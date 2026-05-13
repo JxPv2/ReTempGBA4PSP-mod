@@ -77,8 +77,7 @@ extern u32 option_frameskip_type;
 extern u32 option_frameskip_value;
 extern u32 option_clock_speed;
 
-/* HBLANK IRQ throttle: 0 or 1 = off (every line). 2-160 = stride S; IRQ only when
-   (VCOUNT % S) == phase, phase rotating 0..S-1 each frame. Emulator option. */
+/* Max HBLANK IRQ edges ORed into REG_IF per frame (0-227, 0 = off). Emulator option. */
 extern u32 option_hblank_irq_cap;
 
 extern char main_path[MAX_PATH];

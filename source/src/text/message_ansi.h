@@ -192,10 +192,10 @@
     "[<] [>] :Select   emulator",
 
     // MSG_OPTION_MENU_HBLANK_IRQ_CAP
-    "HBLANK IRQ stride: %d",
+    "HBLANK IRQ cap: %d",
 
     // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
-    "[<] [>] :0/1=off  2-160=stride, phase rotates/frame",
+    "[<] [>] :0=off  1-227=max IRQ/frame",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-3s %2d:%02d:%02d",
@@ -761,10 +761,10 @@
     FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":选择   模拟器配置",
 
     // MSG_OPTION_MENU_HBLANK_IRQ_CAP
-    "HBLANK IRQ stride: %d",
+    "HBLANK IRQ cap: %d",
 
     // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
-    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0/1=关  2-160=步进+每帧轮换相位",
+    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=关  1-227=每帧上限",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%02d/%02d %-4s %2d:%02d:%02d",
@@ -1330,10 +1330,10 @@
     FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":選擇   模擬器配置",
 
     // MSG_OPTION_MENU_HBLANK_IRQ_CAP
-    "HBLANK IRQ stride: %d",
+    "HBLANK IRQ cap: %d",
 
     // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
-    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0/1=關  2-160=步進+每幀輪換相位",
+    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=關  1-227=每幀上限",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-4s %2d:%02d:%02d",

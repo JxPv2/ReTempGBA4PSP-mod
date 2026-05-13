@@ -1065,6 +1065,7 @@ u32 menu(void)
 
   auto void gamepak_file_none(void);
   auto void gamepak_file_reopen(void);
+  auto void menu_show_game_txt_debug(void);
 
   void menu_init(void)
   {
@@ -1263,7 +1264,7 @@ u32 menu(void)
 	option_screen_capture_format = 0;
 	option_enable_analog = 0;
 	option_analog_sensitivity = 4;
-	option_hblank_irq_cap = 0;
+	option_hblank_irq_cap = 160;
 	//int id_language;
 	sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);
 	if (id_language == PSP_SYSTEMPARAM_LANGUAGE_JAPANESE)
@@ -1517,6 +1518,98 @@ u32 menu(void)
     quit();
   }
 
+  void menu_show_game_txt_debug(void)
+  {
+    char buf[2400];
+    char *p;
+    char *end = buf + sizeof(buf);
+    int i;
+    GUI_ACTION_TYPE gui_action = CURSOR_NONE;
+
+    if (gamepak_filename[0] == '\0')
+    {
+      error_msg(MSG[MSG_NON_LOAD_GAME], CONFIRMATION_CONT);
+      return;
+    }
+
+    snprintf(buf, sizeof(buf),
+      "ROM header: internal title @0xA0 (12 bytes), game_code @0xAC (4), maker @0xB0 (2).\n"
+      "game_config.txt matches game_name, game_code, then vender_code or vendor_code.\n\n"
+      "%s%s\n\n"
+      "Hex 0xA0..0xB1 (18 bytes): ",
+      main_path,
+      "game_config.txt");
+
+    p = buf + strlen(buf);
+    for (i = 0; i < 18 && p < end - 6; i++)
+    {
+      p += snprintf(p, (size_t)(end - p), "%s%02X", (i > 0) ? " " : "", (unsigned)gamepak_rom[0xA0 + (unsigned)i]);
+    }
+    p += snprintf(p, (size_t)(end - p), "\n\n");
+
+    p += snprintf(p, (size_t)(end - p), "idle_loop_eliminate_target (%d / %d):\n",
+                  (int)idle_loop_targets, MAX_IDLE_LOOPS);
+    if (idle_loop_targets <= 0)
+      snprintf(p, (size_t)(end - p), "  (none loaded)\n");
+    else
+    {
+      for (i = 0; i < idle_loop_targets && p < end - 48; i++)
+      {
+        p += snprintf(p, (size_t)(end - p), "  %2d: 0x%08X\n", i, (unsigned)idle_loop_target_pc[i]);
+      }
+    }
+
+    p = buf + strlen(buf);
+    p += snprintf(p, (size_t)(end - p), "\nSMC gates smc_gate / smc_cutpoint (%d / %d):\n",
+                  (int)smc_gate_targets, MAX_SMC_GATES);
+    if (smc_gate_targets <= 0)
+      snprintf(p, (size_t)(end - p), "  (none loaded)\n");
+    else
+    {
+      for (i = 0; i < smc_gate_targets && p < end - 48; i++)
+      {
+        p += snprintf(p, (size_t)(end - p), "  %2d: 0x%08X\n", i, (unsigned)smc_gate_pc[i]);
+      }
+    }
+
+    i = (int)strlen(buf);
+    snprintf(buf + i, sizeof(buf) - (size_t)i, "\n\n%s", MSG[MSG_ERR_CONT]);
+
+    clear_screen(COLOR32_BLACK);
+    /* mh_print (print_string) does not wrap on '\n'; only print the first line. */
+    {
+      u16 ypos = 6;
+      char *walk = buf;
+
+      while (*walk != '\0' && (u32)ypos + FONTHEIGHT <= PSP_SCREEN_HEIGHT)
+      {
+        char *nl = strchr(walk, '\n');
+
+        if (nl != NULL)
+          *nl = '\0';
+
+        if (option_language == 0)
+          print_string(walk, 6, ypos, COLOR15_WHITE, COLOR15_BLACK);
+        else
+          print_string_gbk(walk, 6, ypos, COLOR15_WHITE, COLOR15_BLACK);
+
+        if (nl != NULL)
+        {
+          *nl = '\n';
+          walk = nl + 1;
+        }
+        else
+          break;
+
+        ypos = (u16)(ypos + FONTHEIGHT);
+      }
+    }
+    flip_screen(1);
+
+    while (gui_action == CURSOR_NONE)
+      gui_action = get_gui_input();
+  }
+
 
   // Marker for help information, don't go past this mark (except \n)------*
   MenuOptionType graphics_options[] =
@@ -1552,7 +1645,7 @@ u32 menu(void)
 
     STRING_SELECTION_OPTION(menu_passive_ram_dynarec_policy, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], ram_dynarec_options, &option_ram_dynarec_policy, 3, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 9),
 
-    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_CAP], &option_hblank_irq_cap, 161, MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP, 10),
+    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_CAP], &option_hblank_irq_cap, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP, 10),
 
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 11),
 
@@ -1661,6 +1754,8 @@ u32 menu(void)
     SUBMENU_OPTION(&gamepad_config_menu, MSG[MSG_MAIN_MENU_5], MSG_MAIN_MENU_HELP_5, 7),
 
     SUBMENU_OPTION(&analog_config_menu, MSG[MSG_MAIN_MENU_6], MSG_MAIN_MENU_HELP_6, 8),
+
+    ACTION_OPTION(menu_show_game_txt_debug, NULL, "game_config.txt (SMC / idle)", MSG_BLANK, 9),
 
     SUBMENU_OPTION(&cheats_misc_menu, MSG[MSG_MAIN_MENU_CHEAT], MSG_MAIN_MENU_HELP_CHEAT, 10),
 
@@ -2274,7 +2369,7 @@ s32 save_config_file(void)
     file_options[15]  = option_enable_analog;
     file_options[16]  = option_analog_sensitivity;
     file_options[17] = option_language;
-    file_options[18] = option_hblank_irq_cap % 161;
+    file_options[18] = option_hblank_irq_cap % 228;
 
     for (i = 0; i < 16; i++)
     {
@@ -2418,7 +2513,7 @@ s32 load_config_file(void)
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
       option_language       = file_options[17] % 4;
-      option_hblank_irq_cap = file_options[18] % 161;
+      option_hblank_irq_cap = file_options[18] % 228;
 
       for (i = 0; i < 16; i++)
       {
@@ -2473,7 +2568,7 @@ s32 load_config_file(void)
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
       option_language       = file_options[17] % 4;
-      option_hblank_irq_cap = 0;
+      option_hblank_irq_cap = 160;
 
       for (i = 0; i < 16; i++)
       {
@@ -2534,7 +2629,7 @@ s32 load_config_file(void)
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
-      option_hblank_irq_cap = 0;
+      option_hblank_irq_cap = 160;
 
       FILE_CLOSE(config_file);
     }
@@ -2575,7 +2670,7 @@ s32 load_config_file(void)
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
-      option_hblank_irq_cap = 0;
+      option_hblank_irq_cap = 160;
 
       FILE_CLOSE(config_file);
     }
@@ -2599,7 +2694,7 @@ s32 load_config_file(void)
   option_screen_capture_format = 0;
   option_enable_analog = 0;
   option_analog_sensitivity = 4;
-  option_hblank_irq_cap = 0;
+  option_hblank_irq_cap = 160;
 
   int id_language;
   sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);

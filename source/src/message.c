@@ -217,10 +217,10 @@ const char *message[4][MSG_END] =
     "\x81\xA8\x81\xA9" ":?I??   ?G?~?????[?^",
 
     // MSG_OPTION_MENU_HBLANK_IRQ_CAP
-    "HBLANK IRQ stride: %d",
+    "HBLANK IRQ cap   : %d",
 
     // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
-    "[<] [>] :0/1=off  2+=stride+rotate (hack)",
+    "[<] [>] :Select   0=off, max 227/frame",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-4s %2d:%02d:%02d",

@@ -3188,7 +3188,7 @@ static u32 InsertUniqueSorted(u32 *Array, u32 Value, s32 Size)
   }
   // ... or we need to move things.
   else {
-    memmove(&Array[Min + 1], &Array[Min], Size - Min);
+    memmove(&Array[Min + 1], &Array[Min], (size_t)(Size - Min) * sizeof(u32));
     Array[Min] = Value;
     return Size + 1;
   }
