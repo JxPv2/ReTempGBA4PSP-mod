@@ -57,6 +57,22 @@ const u8 ALIGN_DATA obj_height_table[] =
   8, 16, 32, 64, 8, 8, 16, 32, 16, 32, 32, 64
 };
 
+/* shape (0..2) x size (0..3) -> [width, height]; shape 3 is prohibited */
+static const u8 obj_dim_table[3][4][2] =
+{
+  { {8, 8}, {16, 16}, {32, 32}, {64, 64} },
+  { {16, 8}, {32, 8}, {32, 16}, {64, 32} },
+  { {8, 16}, {8, 32}, {16, 32}, {32, 64} }
+};
+
+#define OBJ_MOD_NORMAL     0
+#define OBJ_MOD_SEMITRAN   1
+#define OBJ_MOD_WINDOW     2
+#define OBJ_MOD_INVALID    3
+
+#define VIDEO_MAX(a, b) ((a) > (b) ? (a) : (b))
+#define VIDEO_MIN(a, b) ((a) < (b) ? (a) : (b))
+
 u8 ALIGN_DATA obj_priority_list[5][160][128];
 u8 ALIGN_DATA obj_priority_count[5][160];
 u8 ALIGN_DATA obj_alpha_count[160];
@@ -1921,23 +1937,9 @@ BitmapLayerRenderStruct bitmap_mode_renderers[3] =
 
 #define render_scanline_obj_partial_alpha(combine_op, alpha_op, map_space)    \
 {                                                                             \
-  u32 obj_mode = ((obj_attribute_0 >> 10) & 0x03);                            \
-  if (obj_mode == 3) obj_mode = 0;                                            \
-                                                                              \
-  if (obj_mode != 0)                                                          \
+  if (((obj_attribute_0 >> 10) & 0x03) != 0)                                  \
   {                                                                           \
-    if ((bldcnt & 0x0080) != 0)                                               \
-    {                                                                         \
-      if ((base_pixel_combine & 0x00000400) != 0)                             \
-        pixel_combine = 0x00000100;                                           \
-      else                                                                    \
-        pixel_combine = 0x00000300;                                           \
-    }                                                                         \
-    else                                                                      \
-    {                                                                         \
-      pixel_combine = 0x00000300;                                             \
-    }                                                                         \
-                                                                              \
+    pixel_combine = 0x00000300;                                               \
     render_scanline_obj_main(combine_op, alpha_obj, map_space);               \
   }                                                                           \
   else                                                                        \
@@ -2016,7 +2018,6 @@ static void render_scanline_obj_##alpha_op##_##map_space(u32 priority, u32 start
     obj_attribute_2 = oam_ptr[2];                                             \
                                                                               \
     obj_size = ((obj_attribute_0 >> 12) & 0x0C) | (obj_attribute_1 >> 14);    \
-    if ((obj_size & 0x0C) == 0x0C) obj_size = 0x00;                           \
                                                                               \
     obj_x = (s32)(obj_attribute_1 << 23) >> 23;                               \
     obj_width = obj_width_table[obj_size];                                    \
@@ -2050,19 +2051,17 @@ render_scanline_obj_builder(copy, copy_bitmap, 1D, no_partial_alpha);
 render_scanline_obj_builder(copy, copy_bitmap, 2D, no_partial_alpha);
 
 
+// Sorts OAM entries (#127..#0) into per-scanline priority lists; drops invisible,
+// prohibited shape/mode, and out-of-bounds objects (libretro-gpsp video.c).
 static void order_obj(u8 video_mode)
 {
   s32 obj_num;
-  s32 obj_x, obj_y, row;
-  s32 obj_width, obj_height;
-  u16 obj_size;
-  u16 obj_priority, obj_mode;
+  u32 row;
   u16 obj_attribute_0, obj_attribute_1, obj_attribute_2;
-  u16 current_count;
   u16 *oam_ptr = oam_ram + 508;
 
-  memset(obj_priority_count, 0, 5 * 160);
-  memset(obj_alpha_count, 0, 160);
+  memset(obj_priority_count, 0, sizeof(obj_priority_count));
+  memset(obj_alpha_count, 0, sizeof(obj_alpha_count));
 
   for (obj_num = 127; obj_num >= 0; obj_num--, oam_ptr -= 4)
   {
@@ -2070,74 +2069,68 @@ static void order_obj(u8 video_mode)
     obj_attribute_1 = oam_ptr[1];
     obj_attribute_2 = oam_ptr[2];
 
-    obj_size = obj_attribute_0 & 0xC000;
+    if ((obj_attribute_0 & 0x0300) == 0x0200)
+      continue;
 
-    if (obj_size == 0xC000)
     {
-      obj_size = 0x0000;
-      obj_attribute_1 &= 0x3FFF;
-    }
+      u16 obj_shape = obj_attribute_0 >> 14;
+      u16 obj_mode = (obj_attribute_0 >> 10) & 0x03;
 
-    obj_mode = (obj_attribute_0 >> 10) & 0x03;
+      if ((obj_shape == 0x03) || (obj_mode == OBJ_MOD_INVALID))
+        continue;
 
-    if (obj_mode == 3)
-      obj_mode = 0;
-
-    if (((obj_attribute_0 & 0x0300) != 0x0200) &&
-        ((video_mode < 3) || ((obj_attribute_2 & 0x3FF) >= 512)))
-    {
-      obj_y = obj_attribute_0 & 0xFF;
-      if (obj_y > 160)
-        obj_y -= 256;
-
-      obj_size = (obj_size >> 12) | (obj_attribute_1 >> 14);
-      obj_priority = (obj_attribute_2 >> 10) & 0x03;
-      obj_height = obj_height_table[obj_size];
-      obj_width = (s32)obj_width_table[obj_size];
-
-      if ((obj_attribute_0 & 0x200) != 0)
+      if ((video_mode < 3) || ((obj_attribute_2 & 0x3FF) >= 512))
       {
-        obj_height <<= 1;
-        obj_width  <<= 1;
-      }
+        u16 obj_size = (obj_attribute_1 >> 14);
+        u16 obj_priority = (obj_attribute_2 >> 10) & 0x03;
+        s32 obj_height = obj_dim_table[obj_shape][obj_size][1];
+        s32 obj_width = obj_dim_table[obj_shape][obj_size][0];
+        s32 obj_y = obj_attribute_0 & 0xFF;
 
-      if (((obj_y + obj_height) > 0) && (obj_y < 160))
-      {
-        obj_x = (s32)(obj_attribute_1 << 23) >> 23;
+        if (obj_y > 160)
+          obj_y -= 256;
 
-        if (((obj_x + obj_width) > 0) && (obj_x < 240))
+        if ((obj_attribute_0 & 0x200) != 0)
         {
-          if (obj_y < 0)
-          {
-            obj_height += obj_y;
-            obj_y = 0;
-          }
+          obj_height *= 2;
+          obj_width *= 2;
+        }
 
-          if ((obj_y + obj_height) >= 160)
-          {
-            obj_height = 160 - obj_y;
-          }
+        if (((obj_y + obj_height) > 0) && (obj_y < 160))
+        {
+          s32 obj_x = (s32)(obj_attribute_1 << 23) >> 23;
 
-          if (obj_mode == 1)
+          if (((obj_x + obj_width) > 0) && (obj_x < 240))
           {
-            for (row = obj_y; row < obj_y + obj_height; row++)
+            u32 starty = VIDEO_MAX(obj_y, 0);
+            u32 endy = VIDEO_MIN(obj_y + obj_height, 160);
+
+            switch (obj_mode)
             {
-              current_count = obj_priority_count[obj_priority][row];
-              obj_priority_list[obj_priority][row][current_count] = obj_num;
-              obj_priority_count[obj_priority][row] = current_count + 1;
-              obj_alpha_count[row] = 1;
-            }
-          }
-          else
-          {
-            if (obj_mode == 2)
-              obj_priority = 4;
+              case OBJ_MOD_SEMITRAN:
+                for (row = starty; row < endy; row++)
+                {
+                  u8 current_count = obj_priority_count[obj_priority][row];
+                  obj_priority_list[obj_priority][row][current_count] = (u8)obj_num;
+                  obj_priority_count[obj_priority][row] = current_count + 1;
+                  obj_alpha_count[row] = 1;
+                }
+                break;
 
-            for (row = obj_y; row < obj_y + obj_height; row++)
-            {
-              current_count = obj_priority_count[obj_priority][row];
-              obj_priority_list[obj_priority][row][current_count] = obj_num;
-              obj_priority_count[obj_priority][row] = current_count + 1;
+              case OBJ_MOD_WINDOW:
+                obj_priority = 4;
+                /* fallthrough */
+              case OBJ_MOD_NORMAL:
+                for (row = starty; row < endy; row++)
+                {
+                  u8 current_count = obj_priority_count[obj_priority][row];
+                  obj_priority_list[obj_priority][row][current_count] = (u8)obj_num;
+                  obj_priority_count[obj_priority][row] = current_count + 1;
+                }
+                break;
+
+              default:
+                break;
             }
           }
         }
