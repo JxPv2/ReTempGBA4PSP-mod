@@ -470,6 +470,10 @@ static void partial_clear_metadata_thumb(u16 *metadata, u16 *metadata_area_start
     {                                                                         \
       pc_address_block = load_gamepak_page(pc_region & 0x3FF);                \
     }                                                                         \
+    else                                                                      \
+    {                                                                         \
+      gamepak_touch_mapped_page(pc_region & 0x3FF);                           \
+    }                                                                         \
   }                                                                           \
 
 #define translate_arm_instruction()                                           \
@@ -3388,6 +3392,10 @@ static u8 *translate_block_##type(u32 pc)                                     \
   if (pc_address_block == NULL)                                               \
   {                                                                           \
     pc_address_block = load_gamepak_page(pc_region & 0x3FF);                  \
+  }                                                                           \
+  else                                                                        \
+  {                                                                           \
+    gamepak_touch_mapped_page(pc_region & 0x3FF);                             \
   }                                                                           \
                                                                               \
   switch (pc >> 24)                                                           \

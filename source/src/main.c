@@ -421,6 +421,8 @@ u32 update_gba(void)
 
           process_cheats();
 
+          clear_gamepak_stickybits();
+
           u32 draw_this_frame = skip_next_frame ^ 0x01;
 
           synchronize();

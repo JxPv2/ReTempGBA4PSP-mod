@@ -89,6 +89,13 @@ u32 gamepak_size;
 // Picks a page to evict
 u32 page_time = 0;
 
+// Sticky ROM page bits (one bit per 32KB ROM page). Cleared each frame so hot
+// code/data pages are not evicted while the CPU is still using them.
+u32 gamepak_sticky_bit[1024 / 32];
+
+#define gamepak_sb_test(idx) \
+  (gamepak_sticky_bit[(idx) >> 5] & (1u << ((idx) & 31)))
+
 typedef struct
 {
   u32 page_timestamp;
@@ -273,6 +280,38 @@ static void init_memory_gamepak(void);
 
 static s32 load_gamepak_raw(char *name);
 static u32 evict_gamepak_page(void);
+
+static inline void touch_gamepak_page(u32 physical_index)
+{
+  u32 word = (physical_index >> 5) & 31;
+  u32 bit = physical_index & 31;
+
+  gamepak_sticky_bit[word] |= (1u << bit);
+}
+
+void clear_gamepak_stickybits(void)
+{
+  memset(gamepak_sticky_bit, 0, sizeof(gamepak_sticky_bit));
+}
+
+void gamepak_touch_mapped_page(u32 physical_index)
+{
+  u32 i;
+
+  if (gamepak_size <= gamepak_ram_buffer_size)
+    return;
+
+  touch_gamepak_page(physical_index);
+
+  for (i = 0; i < gamepak_ram_pages; i++)
+  {
+    if (gamepak_memory_map[i].physical_index == physical_index)
+    {
+      gamepak_memory_map[i].page_timestamp = page_time++;
+      return;
+    }
+  }
+}
 
 char backup_id[16];
 static void load_backup_id(void);
@@ -798,6 +837,8 @@ static u32 read32_oam_ram(u32 address)
                                                                               \
       if (read_rom_block == NULL)                                             \
         read_rom_block = load_gamepak_page(read_rom_region & 0x3FF);          \
+      else                                                                    \
+        gamepak_touch_mapped_page(read_rom_region & 0x3FF);                   \
     }                                                                         \
                                                                               \
     return ADDRESS##type(read_rom_block, address & 0x7FFF);                   \
@@ -2665,18 +2706,37 @@ CPU_ALERT_TYPE dma_transfer(DmaTransferType *dma)
 
 static u32 evict_gamepak_page(void)
 {
-  // Find the one with the smallest frame timestamp
+  // Prefer evicting a non-sticky slot (LRU among those); if all are sticky,
+  // fall back to global LRU.
   u32 page_index = 0;
   u32 physical_index;
-  u32 smallest = gamepak_memory_map[0].page_timestamp;
+  u32 smallest;
   u32 i;
+  u32 found = 0;
 
-  for (i = 1; i < gamepak_ram_pages; i++)
+  for (i = 0; i < gamepak_ram_pages; i++)
   {
-    if (gamepak_memory_map[i].page_timestamp <= smallest)
+    if (gamepak_sb_test(gamepak_memory_map[i].physical_index))
+      continue;
+
+    if (!found || gamepak_memory_map[i].page_timestamp <= smallest)
     {
       smallest = gamepak_memory_map[i].page_timestamp;
       page_index = i;
+      found = 1;
+    }
+  }
+
+  if (!found)
+  {
+    smallest = gamepak_memory_map[0].page_timestamp;
+    for (i = 1; i < gamepak_ram_pages; i++)
+    {
+      if (gamepak_memory_map[i].page_timestamp <= smallest)
+      {
+        smallest = gamepak_memory_map[i].page_timestamp;
+        page_index = i;
+      }
     }
   }
 
@@ -2712,6 +2772,8 @@ u8 *load_gamepak_page(u32 physical_index)
   // If RTC is active page the RTC register bytes so they can be read
   if ((rtc_state != RTC_DISABLED) && (physical_index == 0))
     memcpy(swap_location + 0xC4, rtc_registers, sizeof(rtc_registers));
+
+  touch_gamepak_page(physical_index);
 
   return swap_location;
 }
@@ -2783,6 +2845,7 @@ void init_gamepak_buffer(void)
   gamepak_memory_map = (GamepakSwapEntryType *)safe_malloc(sizeof(GamepakSwapEntryType) * gamepak_ram_pages);
 
   memset(gamepak_memory_map, 0, sizeof(GamepakSwapEntryType) * gamepak_ram_pages);
+  clear_gamepak_stickybits();
 }
 
 

@@ -215,6 +215,8 @@ CPU_ALERT_TYPE write_io_register32(u32 address, u32 value);
 CPU_ALERT_TYPE dma_transfer(DmaTransferType *dma);
 
 u8 *load_gamepak_page(u32 physical_index);
+void clear_gamepak_stickybits(void);
+void gamepak_touch_mapped_page(u32 physical_index);
 
 s32 load_bios(char *name);
 s32 load_gamepak(char *name);
