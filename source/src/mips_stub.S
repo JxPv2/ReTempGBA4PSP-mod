@@ -3069,7 +3069,7 @@ io_alert:
   addiu $sp, $sp, 4               # fix the stack
 
   bne $1, $0, lookup_pc_changed
-  addu $17, $2, $0                # $17 = new cycle count (delay)
+  addu $17, $2, $0                # $17 = new cycle count (delay slot)
 
   restore_registers_0             # restore registers 1/2
   jr $ra                          # return
@@ -3089,7 +3089,7 @@ io_update_gba:
   addiu $sp, $sp, 4               # fix the stack
 
   bne $1, $0, lookup_pc_changed
-  addu $17, $2, $0                # $17 = new cycle count (delay)
+  addu $17, $2, $0                # $17 = new cycle count (delay slot)
 
   restore_registers_0             # restore registers 1/2
   jr $ra                          # return
@@ -3117,7 +3117,7 @@ io_smc_alert:
   lw $1, CHANGED_PC_STATUS($16)
 
   bne $1, $0, lookup_pc_changed
-  addu $17, $2, $0                # $17 = new cycle count (delay)
+  addu $17, $2, $0                # $17 = new cycle count (delay slot)
 
   j lookup_pc
   nop
@@ -3134,7 +3134,7 @@ smc_write_update_gba:
   lw $1, CHANGED_PC_STATUS($16)
 
   bne $1, $0, lookup_pc_changed
-  addu $17, $2, $0                # $17 = new cycle count (delay)
+  addu $17, $2, $0                # $17 = new cycle count (delay slot)
 
   j lookup_pc
   nop

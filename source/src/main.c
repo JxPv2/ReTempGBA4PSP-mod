@@ -55,6 +55,8 @@ u32 option_hblank_irq_cap = 160;
 
 static u32 hblank_irq_raised_count;
 
+#define GBA_IRQ_DELAY_CYCLES    9
+
 char main_path[MAX_PATH];
 
 int date_format = 0;
@@ -235,7 +237,7 @@ void direct_sound_timer_select(u32 value)
 
 static void cpu_interrupt(void)
 {
-  // Interrupt handler in BIOS
+  // Interrupt handler in BIOS (must run BIOS stub; it saves regs before user ISR)
   reg_mode[MODE_IRQ][6] = reg[REG_PC] + 4;
   spsr[MODE_IRQ] = reg[REG_CPSR];
   reg[REG_CPSR] = (reg[REG_CPSR] & ~0xFF) | 0x92; // set mode IRQ & disable IRQ
@@ -501,8 +503,10 @@ u32 update_gba(void)
           {
             // IRQ delay - Tsyncmax=3, Texc=3, Tirq=2, Tldm=20
             //             Tsyncmin=2
-            irq_ticks = 9;
+            irq_ticks = GBA_IRQ_DELAY_CYCLES;
             cpu_init_state = 1;
+            reg[EXECUTE_CYCLES] = GBA_IRQ_DELAY_CYCLES;
+            goto update_gba_loop;
           }
         }
       }

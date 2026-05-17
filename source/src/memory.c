@@ -2746,20 +2746,33 @@ static void init_memory_gamepak(void)
 
 void init_gamepak_buffer(void)
 {
-  gamepak_ram_buffer_size = 32 * 1024 * 1024;
-  gamepak_rom = (u8 *)memalign(MEM_ALIGN, gamepak_ram_buffer_size);
-
-  while (gamepak_rom == NULL)
+  static const u32 buffer_sizes[] =
   {
-    gamepak_ram_buffer_size >>= 1;
+    32 * 1024 * 1024,
+    16 * 1024 * 1024,
+    12 * 1024 * 1024,
+     8 * 1024 * 1024,
+     4 * 1024 * 1024,
+     2 * 1024 * 1024,
+     1 * 1024 * 1024,
+  };
+  u32 i;
 
-    if (gamepak_ram_buffer_size == 0)
-    {
-      error_msg(MSG[MSG_ERR_MALLOC], CONFIRMATION_QUIT);
-      quit();
-    }
+  gamepak_rom = NULL;
 
+  for (i = 0; i < sizeof(buffer_sizes) / sizeof(buffer_sizes[0]); i++)
+  {
+    gamepak_ram_buffer_size = buffer_sizes[i];
     gamepak_rom = (u8 *)memalign(MEM_ALIGN, gamepak_ram_buffer_size);
+
+    if (gamepak_rom != NULL)
+      break;
+  }
+
+  if (gamepak_rom == NULL)
+  {
+    error_msg(MSG[MSG_ERR_MALLOC], CONFIRMATION_QUIT);
+    quit();
   }
 
   memset(gamepak_rom, 0, gamepak_ram_buffer_size);
