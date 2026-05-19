@@ -588,6 +588,15 @@ const char *message[4][MSG_END] =
     // MSG_ERR_QUIT
     "?????{?^??????????I?????????B",
 
+    // MSG_LOAD_STATE_NO
+    "Load state slot: %d",
+
+    // MSG_SAVE_STATE_NO
+    "Save state slot: %d",
+
+    // MSG_YES_NO
+    "O: Yes    X: No",
+
     // MSG_BLANK
     ""
   },

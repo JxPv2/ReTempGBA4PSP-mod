@@ -1055,6 +1055,39 @@ void error_msg(const char *text, u8 confirm)
   }
 }
 
+u32 yesno_dialog(const char *text)
+{
+  GUI_ACTION_TYPE gui_action = CURSOR_NONE;
+  const u16 dlg_x1 = 72;
+  const u16 dlg_y1 = 96;
+  const u16 dlg_x2 = 407;
+  const u16 dlg_y2 = 176;
+
+  draw_box_fill(dlg_x1, dlg_y1, dlg_x2, dlg_y2, COLOR15_BLACK);
+  draw_box_line(dlg_x1, dlg_y1, dlg_x2, dlg_y2, COLOR15_WHITE);
+
+  if (option_language == 0)
+  {
+    print_string(text, X_POS_CENTER, dlg_y1 + 24, COLOR15_WHITE, COLOR15_BLACK);
+    print_string(MSG[MSG_YES_NO], X_POS_CENTER, dlg_y1 + 56, COLOR15_WHITE, COLOR15_BLACK);
+  }
+  else
+  {
+    print_string_gbk(text, X_POS_CENTER, dlg_y1 + 24, COLOR15_WHITE, COLOR15_BLACK);
+    print_string_gbk(MSG[MSG_YES_NO], X_POS_CENTER, dlg_y1 + 56, COLOR15_WHITE, COLOR15_BLACK);
+  }
+
+  flip_screen(1);
+
+  while ((gui_action != CURSOR_SELECT) && (gui_action != CURSOR_EXIT))
+  {
+    gui_action = get_gui_input();
+    sceKernelDelayThread(15000);
+  }
+
+  return (gui_action == CURSOR_SELECT) ? 0 : 1;
+}
+
 
 int set_cpu_clock(u32 psp_clock)
 {

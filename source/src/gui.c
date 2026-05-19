@@ -156,7 +156,7 @@ typedef struct _MenuType MenuType;
 
 #define SAVESTATE_OPTION(number)                                              \
 {                                                                             \
-  menu_select_savestate,                                                      \
+  NULL,                                                                       \
   NULL,                                                                       \
   NULL,                                                                       \
   savestate_timestamps[number],                                               \
@@ -1041,7 +1041,6 @@ u32 menu(void)
   auto void menu_screen_capture(void);
 
   auto void menu_change_state(void);
-  auto void menu_select_savestate(void);
   auto void menu_save_state(void);
   auto void menu_load_state(void);
   auto void menu_load_state_file(void);
@@ -1217,14 +1216,6 @@ u32 menu(void)
       return_value = 1;
       repeat = 0;
     }
-  }
-
-  void menu_select_savestate(void)
-  {
-    if (savestate_action != 0)
-      menu_save_state();
-    else
-      menu_load_state();
   }
 
   void menu_load_state_file(void)
@@ -1865,6 +1856,9 @@ u32 menu(void)
       current_menu->init_function();
     }
 
+    if (current_menu == &savestate_menu)
+      submenu_savestate();
+
     if (current_menu && current_menu->options)
     {
       display_option = current_menu->options;
@@ -2054,6 +2048,13 @@ u32 menu(void)
                     menu_load_state_file();
                     break;
                   default:
+                    if (current_option->line_number < 10)
+                    {
+                      if (savestate_action != 0)
+                        menu_save_state();
+                      else
+                        menu_load_state();
+                    }
                     break;
                 }
               }

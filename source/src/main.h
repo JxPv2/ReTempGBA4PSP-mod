@@ -106,6 +106,8 @@ void reset_gba(void);
 void quit(void);
 
 void error_msg(const char *text, u8 confirm);
+/* Returns 0 to proceed (O), 1 to cancel (X). */
+u32 yesno_dialog(const char *text);
 void change_ext(char *src, char *buffer, const char *extension);
 
 u64 ticker(void);

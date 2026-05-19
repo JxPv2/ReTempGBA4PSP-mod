@@ -563,6 +563,15 @@
     // MSG_ERR_QUIT
     "Press any button to exit.",
 
+    // MSG_LOAD_STATE_NO
+    "Load state slot: %d",
+
+    // MSG_SAVE_STATE_NO
+    "Save state slot: %d",
+
+    // MSG_YES_NO
+    "O: Yes    X: No",
+
     // MSG_BLANK
     ""
   },
@@ -1132,6 +1141,15 @@
     // MSG_ERR_QUIT
     "请按任意键结束。",
 
+    // MSG_LOAD_STATE_NO
+    "读取即时存档槽: %d",
+
+    // MSG_SAVE_STATE_NO
+    "保存即时存档槽: %d",
+
+    // MSG_YES_NO
+    "O: 是    X: 否",
+
     // MSG_BLANK
     ""
   },
@@ -1700,6 +1718,15 @@
 
     // MSG_ERR_QUIT
     "請按任意鍵結束。",
+
+    // MSG_LOAD_STATE_NO
+    "讀取即時存檔槽: %d",
+
+    // MSG_SAVE_STATE_NO
+    "保存即時存檔槽: %d",
+
+    // MSG_YES_NO
+    "O: 是    X: 否",
 
     // MSG_BLANK
     ""

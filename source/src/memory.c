@@ -2808,27 +2808,54 @@ static void init_memory_gamepak(void)
 
 void init_gamepak_buffer(void)
 {
-  static const u32 buffer_sizes[] =
+  /* Allocation strategy:
+   *   1. Try the large preferred sizes (32 MiB, then 16 MiB).
+   *   2. If 16 MiB fails, step down by 1 MiB at a time (15, 14, ...).
+   *      This mirrors gpSP-kai and avoids the previous cliff from 16 MiB
+   *      straight to 8 MiB, which forced 16 MiB ROMs (e.g. Fire Emblem:
+   *      The Sacred Stones) into paged mode and caused noticeable stalls
+   *      whenever new ROM pages were touched (phase-intro graphics,
+   *      battle transitions, etc.).
+   *   3. Final hard floor at 1 MiB. */
+  static const u32 MIN_BUFFER_SIZE  = 1 * 1024 * 1024;
+  static const u32 STEP_BUFFER_SIZE = 1 * 1024 * 1024;
+  static const u32 large_buffer_sizes[] =
   {
     32 * 1024 * 1024,
     16 * 1024 * 1024,
-    12 * 1024 * 1024,
-     8 * 1024 * 1024,
-     4 * 1024 * 1024,
-     2 * 1024 * 1024,
-     1 * 1024 * 1024,
   };
   u32 i;
+  u32 size;
 
   gamepak_rom = NULL;
 
-  for (i = 0; i < sizeof(buffer_sizes) / sizeof(buffer_sizes[0]); i++)
+  /* Pass 1: large preferred sizes. */
+  for (i = 0; i < sizeof(large_buffer_sizes) / sizeof(large_buffer_sizes[0]); i++)
   {
-    gamepak_ram_buffer_size = buffer_sizes[i];
+    gamepak_ram_buffer_size = large_buffer_sizes[i];
     gamepak_rom = (u8 *)memalign(MEM_ALIGN, gamepak_ram_buffer_size);
 
     if (gamepak_rom != NULL)
       break;
+  }
+
+  /* Pass 2: 1 MiB step-down from just below 16 MiB to the 1 MiB floor. */
+  if (gamepak_rom == NULL)
+  {
+    for (size = (16 * 1024 * 1024) - STEP_BUFFER_SIZE;
+         size >= MIN_BUFFER_SIZE;
+         size -= STEP_BUFFER_SIZE)
+    {
+      gamepak_ram_buffer_size = size;
+      gamepak_rom = (u8 *)memalign(MEM_ALIGN, gamepak_ram_buffer_size);
+
+      if (gamepak_rom != NULL)
+        break;
+
+      /* size is unsigned; guard against underflow on the final step. */
+      if (size < MIN_BUFFER_SIZE + STEP_BUFFER_SIZE)
+        break;
+    }
   }
 
   if (gamepak_rom == NULL)
@@ -3687,6 +3714,17 @@ void load_state(char *savestate_filename)
 {
   SceUID savestate_file;
   char savestate_path[MAX_PATH];
+  char confirm_text[64];
+  u32 prev_sound_pause = sound_pause;
+
+  sprintf(confirm_text, MSG[MSG_LOAD_STATE_NO], (int)savestate_slot);
+  sound_pause = 1;
+  if (yesno_dialog(confirm_text) != 0)
+  {
+    sound_pause = prev_sound_pause;
+    return;
+  }
+  sound_pause = prev_sound_pause;
 
   sprintf(savestate_path, "%s%s", dir_state, savestate_filename);
 
@@ -3717,6 +3755,17 @@ void save_state(char *savestate_filename, u16 *screen_capture)
 {
   SceUID savestate_file;
   char savestate_path[MAX_PATH];
+  char confirm_text[64];
+  u32 prev_sound_pause = sound_pause;
+
+  sprintf(confirm_text, MSG[MSG_SAVE_STATE_NO], (int)savestate_slot);
+  sound_pause = 1;
+  if (yesno_dialog(confirm_text) != 0)
+  {
+    sound_pause = prev_sound_pause;
+    return;
+  }
+  sound_pause = prev_sound_pause;
 
   u8 *savestate_write_buffer;
 
