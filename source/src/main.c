@@ -51,9 +51,8 @@ u32 option_frameskip_type = FRAMESKIP_AUTO;
 u32 option_frameskip_value = 9;
 u32 option_clock_speed = PSP_CLOCK_333;
 
-u32 option_hblank_irq_cap = 160;
-
-static u32 hblank_irq_raised_count;
+u32 option_hblank_irq_window_start = 1;
+u32 option_hblank_irq_window_end = 160;
 
 #define GBA_IRQ_DELAY_CYCLES    9
 
@@ -363,13 +362,20 @@ u32 update_gba(void)
         // H-blank interrupts do occur during v-blank (unlike hdma, which does not)
         if ((dispstat & 0x10) != 0)
         {
-          if (option_hblank_irq_cap == 0 ||
-              hblank_irq_raised_count < option_hblank_irq_cap)
+          u32 allow_hblank_irq = 1;
+
+          if (option_hblank_irq_window_start != 0 &&
+              option_hblank_irq_window_end != 0)
           {
-            irq_raised |= IRQ_HBLANK;
-            if (option_hblank_irq_cap != 0)
-              hblank_irq_raised_count++;
+            u32 scanline = vcount + 1;
+
+            allow_hblank_irq =
+              (scanline >= option_hblank_irq_window_start &&
+               scanline <= option_hblank_irq_window_end);
           }
+
+          if (allow_hblank_irq != 0)
+            irq_raised |= IRQ_HBLANK;
         }
       }
       else
@@ -434,9 +440,6 @@ u32 update_gba(void)
             flip_screen(0);
 
           vcount = 0;
-
-          if (option_hblank_irq_cap != 0)
-            hblank_irq_raised_count = 0;
         }
 
         if (vcount == (dispstat >> 8))
@@ -675,8 +678,6 @@ static void init_main(void)
 
   irq_ticks = 0;
   cpu_init_state = 0;
-
-  hblank_irq_raised_count = 0;
 
   if (!caches_inited)
   {

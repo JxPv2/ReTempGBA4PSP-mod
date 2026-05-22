@@ -77,8 +77,9 @@ extern u32 option_frameskip_type;
 extern u32 option_frameskip_value;
 extern u32 option_clock_speed;
 
-/* Max HBLANK IRQ edges ORed into REG_IF per frame (0-227, 0 = off). Emulator option. */
-extern u32 option_hblank_irq_cap;
+/* HBLANK IRQ scanline window (1-based, 0 = off). Either 0 disables the window. */
+extern u32 option_hblank_irq_window_start;
+extern u32 option_hblank_irq_window_end;
 
 extern char main_path[MAX_PATH];
 
