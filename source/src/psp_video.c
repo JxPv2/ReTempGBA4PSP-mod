@@ -1,39 +1,12 @@
 #include "common.h"
 #include "psp_video.h"
-#include <pspge.h>
 #include "volume_icon.c"
 
 #define VOLICON_OFFSET (GBA_SCREEN_HEIGHT + 32)
 #define GBA_TEXTURE_BYTES (GBA_LINE_SIZE * GBA_SCREEN_HEIGHT * 2)
 
-#define GE_CMD_NOP    0x00
-#define GE_CMD_VADDR  0x01
-#define GE_CMD_IADDR  0x02
-#define GE_CMD_PRIM   0x04
-#define GE_CMD_SIGNAL 0x0C
-#define GE_CMD_FINISH 0x0F
-#define GE_CMD_BASE   0x10
-#define GE_CMD_VTYPE  0x12
-#define GE_CMD_FBP    0x9C
-#define GE_CMD_FBW    0x9D
-#define GE_CMD_TBP0   0xA0
-#define GE_CMD_TBW0   0xA8
-#define GE_CMD_TSIZE0 0xB8
-#define GE_CMD_TFLUSH 0xCB
-#define GE_CMD_CLEAR  0xD3
-
-#define GE_CMD(op, operand) (((op) << 24) | (operand))
-
 static u32 ALIGN_PSPDATA display_list[512];
-static u32 ALIGN_PSPDATA ge_present_cmd[24];
-static u32 *ge_present_cmd_end;
-static u32 ge_present_fbp_slot;
-static u32 ge_present_fbw_slot;
-static u32 ge_present_tbp0_slot;
-static u32 ge_present_tbw0_slot;
-static int ge_present_cb_id;
-
-static float ALIGN_PSPDATA screen_sprite[10];
+static u32 ALIGN_PSPDATA display_list_0[64];
 
 static void *disp_frame;
 static void *draw_frame;
@@ -45,8 +18,7 @@ typedef struct
 } Vertex;
 
 static void set_gba_resolution(void);
-static void update_screen_sprite(float scale_x, float scale_y);
-static void init_ge_present(void);
+static void rebuild_present_list(float scale_x, float scale_y);
 static void bitbilt_gu(void);
 static void bitbilt_sw(void);
 static void *psp_vram_addr(void *frame, u32 x, u32 y);
@@ -54,99 +26,44 @@ static void writeback_screen_texture(void);
 static void load_volume_icon(int devkit_version);
 static void draw_volume(int volume);
 
-static void ge_present_finish(int id, void *arg)
-{
-  (void)id;
-  (void)arg;
-}
-
 static void writeback_screen_texture(void)
 {
-  sceKernelDcacheWritebackInvalidateRange(screen_texture, GBA_TEXTURE_BYTES);
+  sceKernelDcacheWritebackRange(screen_texture, GBA_TEXTURE_BYTES);
 }
 
-static void writeback_ge_present(void)
-{
-  u32 bytes = (u32)((u8 *)ge_present_cmd_end - (u8 *)ge_present_cmd);
-
-  sceKernelDcacheWritebackInvalidateRange(ge_present_cmd, bytes);
-  sceKernelDcacheWritebackInvalidateRange(screen_sprite, sizeof(screen_sprite));
-}
-
-static void patch_ge_present_targets(void *framebuffer, u16 *texture)
-{
-  u32 fb_addr = 0x04000000 + (u32)framebuffer;
-  u32 tex_addr = (u32)texture;
-
-  ge_present_cmd[ge_present_fbp_slot] =
-    GE_CMD(GE_CMD_FBP, fb_addr & 0x00FFFFFF);
-  ge_present_cmd[ge_present_fbw_slot] =
-    GE_CMD(GE_CMD_FBW, ((fb_addr & 0xFF000000) >> 8) | PSP_LINE_SIZE);
-
-  ge_present_cmd[ge_present_tbp0_slot] =
-    GE_CMD(GE_CMD_TBP0, tex_addr & 0x00FFFFFF);
-  ge_present_cmd[ge_present_tbw0_slot] =
-    GE_CMD(GE_CMD_TBW0, ((tex_addr & 0xFF000000) >> 8) | GBA_LINE_SIZE);
-}
-
-static void init_ge_present(void)
-{
-  u32 *cmd = ge_present_cmd;
-  u32 fb_addr = 0x04000000 + (u32)draw_frame;
-  u32 tex_addr = (u32)screen_texture;
-  PspGeCallbackData ge_cb;
-
-  ge_present_fbp_slot = (u32)(cmd - ge_present_cmd);
-  *cmd++ = GE_CMD(GE_CMD_FBP, fb_addr & 0x00FFFFFF);
-
-  ge_present_fbw_slot = (u32)(cmd - ge_present_cmd);
-  *cmd++ = GE_CMD(GE_CMD_FBW, ((fb_addr & 0xFF000000) >> 8) | PSP_LINE_SIZE);
-
-  ge_present_tbp0_slot = (u32)(cmd - ge_present_cmd);
-  *cmd++ = GE_CMD(GE_CMD_TBP0, tex_addr & 0x00FFFFFF);
-
-  ge_present_tbw0_slot = (u32)(cmd - ge_present_cmd);
-  *cmd++ = GE_CMD(GE_CMD_TBW0, ((tex_addr & 0xFF000000) >> 8) | GBA_LINE_SIZE);
-
-  *cmd++ = GE_CMD(GE_CMD_TSIZE0, (8 << 8) | 8);
-  *cmd++ = GE_CMD(GE_CMD_TFLUSH, 0);
-  *cmd++ = GE_CMD(GE_CMD_VTYPE, (1 << 23) | (3 << 7) | 3);
-  *cmd++ = GE_CMD(GE_CMD_BASE, 0);
-  *cmd++ = GE_CMD(GE_CMD_IADDR, 0);
-  *cmd++ = GE_CMD(GE_CMD_BASE, ((u32)screen_sprite & 0xFF000000) >> 8);
-  *cmd++ = GE_CMD(GE_CMD_VADDR, (u32)screen_sprite & 0x00FFFFFF);
-  *cmd++ = GE_CMD(GE_CMD_PRIM, (6 << 16) | 2);
-  *cmd++ = GE_CMD(GE_CMD_FINISH, 0);
-
-  ge_present_cmd_end = cmd;
-
-  ge_cb.finish_func = ge_present_finish;
-  ge_cb.finish_arg = NULL;
-  ge_cb.signal_func = NULL;
-  ge_cb.signal_arg = NULL;
-  ge_present_cb_id = sceGeSetCallback(&ge_cb);
-}
-
-static void update_screen_sprite(float scale_x, float scale_y)
+static void rebuild_present_list(float scale_x, float scale_y)
 {
   s32 dw = (s32)(GBA_SCREEN_WIDTH  * scale_x);
   s32 dh = (s32)(GBA_SCREEN_HEIGHT * scale_y);
   s32 dx = (PSP_SCREEN_WIDTH  - dw) / 2;
   s32 dy = (PSP_SCREEN_HEIGHT - dh) / 2;
+  Vertex *vertices;
 
-  screen_sprite[0] = 0.0f;
-  screen_sprite[1] = 0.0f;
-  screen_sprite[2] = (float)dx;
-  screen_sprite[3] = (float)dy;
-  screen_sprite[4] = 0.0f;
+  sceGuStart(GU_CALL, display_list_0);
 
-  screen_sprite[5] = (float)GBA_SCREEN_WIDTH;
-  screen_sprite[6] = (float)GBA_SCREEN_HEIGHT;
-  screen_sprite[7] = (float)(dx + dw);
-  screen_sprite[8] = (float)(dy + dh);
-  screen_sprite[9] = 0.0f;
+  sceGuClear(GU_COLOR_BUFFER_BIT | GU_FAST_CLEAR_BIT);
 
-  sceKernelDcacheWritebackInvalidateRange(screen_sprite, sizeof(screen_sprite));
+  vertices = (Vertex *)sceGuGetMemory(2 * sizeof(Vertex));
+
+  if (vertices != NULL)
+  {
+    vertices[0].u = 0;
+    vertices[0].v = 0;
+    vertices[0].x = (u16)dx;
+    vertices[0].y = (u16)dy;
+    vertices[0].z = 0;
+
+    vertices[1].u = GBA_SCREEN_WIDTH;
+    vertices[1].v = GBA_SCREEN_HEIGHT;
+    vertices[1].x = (u16)(dx + dw);
+    vertices[1].y = (u16)(dy + dh);
+    vertices[1].z = 0;
+
+    sceGuDrawArray(GU_SPRITES, GU_TEXTURE_16BIT | GU_VERTEX_16BIT | GU_TRANSFORM_2D,
+                   2, 0, vertices);
+  }
+
+  sceGuFinish();
 }
 
 int (*__draw_volume_status)(int draw);
@@ -154,8 +71,6 @@ int (*__draw_volume_status)(int draw);
 
 void init_video(int devkit_version)
 {
-  u32 ALIGN_PSPDATA clear_list[4];
-
   disp_frame = (void *)0;
   draw_frame = (void *)PSP_FRAME_SIZE;
 
@@ -188,15 +103,8 @@ void init_video(int devkit_version)
   sceDisplayWaitVblankStart();
   sceGuDisplay(GU_TRUE);
 
-  update_screen_sprite(1.5f, 1.5f);
-  init_ge_present();
+  rebuild_present_list(1.5f, 1.5f);
   update_screen = bitbilt_gu;
-
-  sceGuStart(GU_DIRECT, clear_list);
-  sceGuClearColor(0);
-  sceGuClear(GU_COLOR_BUFFER_BIT | GU_FAST_CLEAR_BIT);
-  sceGuFinish();
-  sceGuSync(0, GU_SYNC_FINISH);
 
   load_volume_icon(devkit_version);
 }
@@ -222,19 +130,15 @@ static void *psp_vram_addr(void *frame, u32 x, u32 y)
 
 static void bitbilt_gu(void)
 {
-  u32 ALIGN_PSPDATA clear_list[4];
-
   writeback_screen_texture();
-  patch_ge_present_targets(draw_frame, screen_texture);
-  writeback_ge_present();
 
-  sceGuClearColor(0);
-  sceGuStart(GU_DIRECT, clear_list);
-  sceGuDrawBufferList(GU_PSM_5551, draw_frame, PSP_LINE_SIZE);
-  sceGuClear(GU_COLOR_BUFFER_BIT | GU_FAST_CLEAR_BIT);
+  sceGuStart(GU_DIRECT, display_list);
+
+  sceGuTexImage(0, 256, 256, GBA_LINE_SIZE, screen_texture);
+  sceGuTexFlush();
+  sceGuCallList(display_list_0);
+
   sceGuFinish();
-
-  sceGeListEnQueue(ge_present_cmd, ge_present_cmd_end, ge_present_cb_id, NULL);
   sceGuSync(0, GU_SYNC_FINISH);
 }
 
@@ -245,14 +149,13 @@ static void bitbilt_sw(void)
   u32 x, y;
   u16 *vptr, *vptr0;
   u16 *d, *d0;
-  u32 ALIGN_PSPDATA clear_list[4];
 
   writeback_screen_texture();
 
-  sceGuStart(GU_DIRECT, clear_list);
-  sceGuClearColor(0);
-  sceGuDrawBufferList(GU_PSM_5551, draw_frame, PSP_LINE_SIZE);
+  sceGuStart(GU_DIRECT, display_list);
+
   sceGuClear(GU_COLOR_BUFFER_BIT | GU_FAST_CLEAR_BIT);
+
   sceGuFinish();
   sceGuSync(0, GU_SYNC_FINISH);
 
@@ -313,12 +216,12 @@ static void set_gba_resolution(void)
   switch (option_screen_scale)
   {
     case SCALED_NONE:
-      update_screen_sprite(1.0f, 1.0f);
+      rebuild_present_list(1.0f, 1.0f);
       update_screen = bitbilt_gu;
       break;
 
     case SCALED_X15_GU:
-      update_screen_sprite(1.5f, 1.5f);
+      rebuild_present_list(1.5f, 1.5f);
       update_screen = bitbilt_gu;
       break;
 
@@ -327,12 +230,12 @@ static void set_gba_resolution(void)
       break;
 
     case SCALED_USER:
-      update_screen_sprite(option_screen_mag / 100.0f, option_screen_mag / 100.0f);
+      rebuild_present_list(option_screen_mag / 100.0f, option_screen_mag / 100.0f);
       update_screen = bitbilt_gu;
       break;
 
     case SCALED_16X9_GU:
-      update_screen_sprite((float)PSP_SCREEN_WIDTH / (float)GBA_SCREEN_WIDTH,
+      rebuild_present_list((float)PSP_SCREEN_WIDTH / (float)GBA_SCREEN_WIDTH,
                            (float)PSP_SCREEN_HEIGHT / (float)GBA_SCREEN_HEIGHT);
       update_screen = bitbilt_gu;
       break;
@@ -463,8 +366,11 @@ static u16 blend_pixel5551(u16 dst, u32 src8888)
   u32 r8 = (sr * sa + dr * inv) / 255;
   u32 g8 = (sg * sa + dg * inv) / 255;
   u32 b8 = (sb * sa + db * inv) / 255;
+  u32 r5 = r8 >> 3;
+  u32 g5 = g8 >> 3;
+  u32 b5 = b8 >> 3;
 
-  return (u16)(0x8000 | ((b8 >> 3) << 10) | ((g8 >> 3) << 5) | (r8 >> 3));
+  return (u16)(0x8000 | (b5 << 10) | (g5 << 5) | r5);
 }
 
 void draw_box_alpha(u16 x1, u16 y1, u16 x2, u16 y2, u32 color)
