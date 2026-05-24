@@ -1955,9 +1955,25 @@ static void partial_clear_metadata_thumb(u16 *metadata, u16 *metadata_area_start
       break;                                                                  \
                                                                               \
     CASE16(0xF0)                                                              \
+    {                                                                         \
       /* SWI comment */                                                       \
-      arm_swi();                                                              \
+      u32 swinum = (opcode >> 16) & 0xFF;                                     \
+      if (swinum == 6)                                                        \
+      {                                                                       \
+        cycle_count += 64;                                                    \
+        arm_hle_div(arm);                                                     \
+      }                                                                       \
+      else if (swinum == 7)                                                   \
+      {                                                                       \
+        cycle_count += 64;                                                    \
+        arm_hle_div_arm(arm);                                                 \
+      }                                                                       \
+      else                                                                    \
+      {                                                                       \
+        arm_swi();                                                            \
+      }                                                                       \
       break;                                                                  \
+    }                                                                         \
                                                                               \
     undefined:                                                                \
     default:                                                                  \
@@ -2384,9 +2400,25 @@ static void arm_flag_status(BlockDataArmType *block_data, u32 opcode)
       break;                                                                  \
                                                                               \
     case 0xDF:                                                                \
+    {                                                                         \
       /* SWI comment */                                                       \
-      thumb_swi();                                                            \
+      u32 swinum = opcode & 0xFF;                                             \
+      if (swinum == 6)                                                        \
+      {                                                                       \
+        cycle_count += 64;                                                    \
+        arm_hle_div(thumb);                                                   \
+      }                                                                       \
+      else if (swinum == 7)                                                   \
+      {                                                                       \
+        cycle_count += 64;                                                    \
+        arm_hle_div_arm(thumb);                                               \
+      }                                                                       \
+      else                                                                    \
+      {                                                                       \
+        thumb_swi();                                                          \
+      }                                                                       \
       break;                                                                  \
+    }                                                                         \
                                                                               \
     CASE08(0xe0)                                                              \
       /* B label */                                                           \
@@ -2860,19 +2892,23 @@ u8 *block_lookup_address_dual(u32 pc)
 // checked against). Because MSR and BX overlap both are checked for.
 
 
+#define is_div_swi(swinum) (((swinum) & 0xFE) == 0x06)
+
 #define arm_exit_point                                                        \
  ((((opcode & 0x0800F000) == 0x0000F000) && ((opcode & 0x0DB0F000) != 0x0120F000)) || /* Rd == R15 && !MSR */ \
   ((opcode & 0x0FFFFFF0) == 0x012FFF10) || /* BX */                           \
   ((opcode & 0x0F108000) == 0x08108000) || /* LDM R15 in list */              \
   ((opcode & 0x0F108000) == 0x09108000) || /* LDM R15 in list */              \
   ((opcode >= 0x0A000000) && (opcode < 0x0F000000)) || /* B, BL, CP */        \
-  ((opcode >= 0x0F000000) && (((opcode >> 16) & 0xFF) < 0xF9))) /* SWI */     \
+  ((opcode >= 0x0F000000) && (((opcode >> 16) & 0xFF) < 0xF9) &&              \
+   !is_div_swi((opcode >> 16) & 0xFF))) /* SWI */                             \
 
 #define arm_opcode_branch                                                     \
   ((opcode & 0x0E000000) == 0x0A000000)                                       \
 
 #define arm_opcode_swi                                                        \
-  (((opcode & 0x0F000000) == 0x0F000000) && (((opcode >> 16) & 0xFF) < 0xF9)) \
+  (((opcode & 0x0F000000) == 0x0F000000) && (((opcode >> 16) & 0xFF) < 0xF9) && \
+   !is_div_swi((opcode >> 16) & 0xFF))                                        \
 
 #define arm_opcode_unconditional_branch                                       \
   (condition == 0x0E)                                                         \
@@ -2972,7 +3008,8 @@ u8 *block_lookup_address_dual(u32 pc)
 
 #define thumb_exit_point                                                      \
   (((opcode >= 0xD000) && (opcode < 0xDF00)) || /* conditional branch */      \
-   (((opcode & 0xFF00) == 0xDF00) && ((opcode & 0xFF) < 0xF9)) || /* SWI */   \
+   (((opcode & 0xFF00) == 0xDF00) && ((opcode & 0xFF) < 0xF9) &&             \
+    !is_div_swi(opcode & 0xFF)) || /* SWI */                                   \
    ((opcode >= 0xE000) && (opcode < 0xE800)) || /* B label */                 \
    ((opcode & 0xFF87) == 0x4487) || /* ADD rd, rs (rd == pc) */               \
    ((opcode & 0xFF87) == 0x4687) || /* MOV rd, rs (rd == pc) */               \
@@ -2986,7 +3023,8 @@ u8 *block_lookup_address_dual(u32 pc)
    (opcode >= 0xF800))                                                        \
 
 #define thumb_opcode_swi                                                      \
-  (((opcode & 0xFF00) == 0xDF00) && ((opcode & 0xFF) < 0xF9))                 \
+  (((opcode & 0xFF00) == 0xDF00) && ((opcode & 0xFF) < 0xF9) &&               \
+   !is_div_swi(opcode & 0xFF))                                                \
 
 #define thumb_opcode_unconditional_branch                                     \
   ((opcode < 0xD000) || (opcode >= 0xDF00))                                   \

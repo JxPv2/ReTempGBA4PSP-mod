@@ -2567,6 +2567,22 @@ void force_user_mode_body(CPU_MODE_TYPE cpu_mode, CPU_MODE_TYPE new_mode)
   generate_indirect_branch_cycle_update(dual);                                \
 }                                                                             \
 
+#define arm_hle_div(cpu_mode)                                                 \
+  mips_emit_div(reg_r0, reg_r1);                                              \
+  mips_emit_mflo(reg_r0);                                                     \
+  mips_emit_mfhi(reg_r1);                                                     \
+  mips_emit_sra(reg_a0, reg_r0, 31);                                          \
+  mips_emit_xor(reg_r3, reg_r0, reg_a0);                                      \
+  mips_emit_subu(reg_r3, reg_r3, reg_a0);                                     \
+
+#define arm_hle_div_arm(cpu_mode)                                             \
+  mips_emit_div(reg_r1, reg_r0);                                             \
+  mips_emit_mflo(reg_r0);                                                     \
+  mips_emit_mfhi(reg_r1);                                                     \
+  mips_emit_sra(reg_a0, reg_r0, 31);                                          \
+  mips_emit_xor(reg_r3, reg_r0, reg_a0);                                      \
+  mips_emit_subu(reg_r3, reg_r3, reg_a0);                                     \
+
 #define arm_swi()                                                             \
 {                                                                             \
   bios_read_protect = 0xe3a02004;                                             \
