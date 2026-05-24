@@ -192,8 +192,11 @@ void add_smc_gate(u32 pc);
 
 void partial_clear_metadata(u32 offset, u8 region);
 void flush_translation_cache(TRANSLATION_REGION_TYPE translation_region, CACHE_FLUSH_REASON_TYPE flush_reason);
+void init_bios_hooks(void);
 void clear_metadata_area(METADATA_AREA_TYPE metadata_area, METADATA_CLEAR_REASON_TYPE clear_reason);
 void dump_translation_cache(void);
+
+extern u8 *bios_swi_entrypoint;
 
 extern u32 reg[64];
 

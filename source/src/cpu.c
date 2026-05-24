@@ -33,6 +33,8 @@ u32 ALIGN_DATA smc_gate_pc[MAX_SMC_GATES];
 
 u32 iwram_stack_optimize = 1;
 
+u8 *bios_swi_entrypoint = NULL;
+
 u32 ALIGN_DATA reg_mode[7][7];
 
 // When switching modes set spsr[new_mode] to cpsr. Modifying PC as the
@@ -2986,7 +2988,10 @@ u8 *block_lookup_address_dual(u32 pc)
   }                                                                           \
 
 #define arm_link_block()                                                      \
-  translation_target = block_lookup_address_arm(branch_target);               \
+  if ((branch_target == 0x00000008) && (bios_swi_entrypoint != NULL))         \
+    translation_target = bios_swi_entrypoint;                                 \
+  else                                                                        \
+    translation_target = block_lookup_address_arm(branch_target);               \
 
 #define arm_instruction_width   (4)
 #define arm_instruction_nibbles (8)
@@ -3057,7 +3062,9 @@ u8 *block_lookup_address_dual(u32 pc)
 #define thumb_set_condition(_condition)                                       \
 
 #define thumb_link_block()                                                    \
-  if (branch_target != 0x00000008)                                            \
+  if ((branch_target == 0x00000008) && (bios_swi_entrypoint != NULL))         \
+    translation_target = bios_swi_entrypoint;                                 \
+  else if (branch_target != 0x00000008)                                       \
   {                                                                           \
     translation_target = block_lookup_address_thumb(branch_target);           \
   }                                                                           \
@@ -3974,6 +3981,11 @@ void clear_metadata_area(METADATA_AREA_TYPE metadata_area, METADATA_CLEAR_REASON
   }
 }
 
+void init_bios_hooks(void)
+{
+  bios_swi_entrypoint = block_lookup_address_arm(0x8);
+}
+
 void flush_translation_cache(TRANSLATION_REGION_TYPE translation_region, CACHE_FLUSH_REASON_TYPE flush_reason)
 {
   switch (translation_region)
@@ -4000,6 +4012,7 @@ void flush_translation_cache(TRANSLATION_REGION_TYPE translation_region, CACHE_F
         default:
           break;
       }
+      init_bios_hooks();
       break;
     case TRANSLATION_REGION_WRITABLE:
       writable_next_code = writable_code_cache;
