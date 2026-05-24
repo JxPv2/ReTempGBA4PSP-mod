@@ -493,6 +493,20 @@ mips_indirect_branch_dual_no_update_gba:
   bne $1, $0, \patch_handler      # if above is true, patch
 .endm
 
+# GBA ROM is mirrored at 0x08-0x0B; share one handler for those regions.
+.macro region_check_gamepak patch_handler
+  srl $1, $4, 26                  # ignore low two bits of the region nibble
+  xori $1, $1, (0x08 >> 2)
+  bne $1, $0, \patch_handler
+.endm
+
+.macro region_check_gamepak_align align_bits, alignment, patch_handler
+  srl $1, $4, 26
+  ins $1, $4, 6, \align_bits
+  xori $1, $1, ((0x08 >> 2) | (\alignment << 6))
+  bne $1, $0, \patch_handler
+.endm
+
 
 .macro ignore_region region, patch_handler
   region_check \region, \patch_handler
@@ -665,6 +679,55 @@ mips_indirect_branch_dual_no_update_gba:
 .macro translate_region_gamepak_align32 region, a_b, alignment, patch_handler
   region_check_align \region, \a_b, \alignment, \patch_handler
   translate_region_gamepak_core 0x7FFC
+.endm
+
+.macro translate_region_gamepak_mirror patch_handler
+  region_check_gamepak \patch_handler
+  translate_region_gamepak_core 0x7FFF
+.endm
+
+.macro translate_region_gamepak_mirror_align16 a_b, alignment, patch_handler
+  region_check_gamepak_align \a_b, \alignment, \patch_handler
+  translate_region_gamepak_core 0x7FFE
+.endm
+
+.macro translate_region_gamepak_mirror_align a_b, alignment, patch_handler
+  region_check_gamepak_align \a_b, \alignment, \patch_handler
+  translate_region_gamepak_core 0x7FFF
+.endm
+
+.macro translate_region_gamepak_mirror_align32 a_b, alignment, patch_handler
+  region_check_gamepak_align \a_b, \alignment, \patch_handler
+  translate_region_gamepak_core 0x7FFC
+.endm
+
+.macro translate_region_gamepak_mirror_a patch_handler
+  region_check_gamepak \patch_handler
+  srl $2, $4, 15                  # $2 = page number of address (delay)
+  sll $2, $2, 2                   # adjust to word index
+  addu $2, $2, $16                # $2 = memory_map_read[address >> 15]
+  lw $2, -32768($2)
+
+  bne $2, $0, 1f                 # if it's non-NULL continue
+  andi $1, $4, 0x7FFC             # $1 = low 15bits of address (delay slot)
+
+  ext $4, $4, 15, 10              # $4 = (address >> 15) & 0x3FF
+
+  sw $1, REG_SAVE($16)            # save offset
+  sw $ra, REG_SAVE2($16)          # save return address
+  sw $6, REG_SAVE3($16)           # save a2
+
+  save_registers_0                # save registers 1/2
+  jal load_gamepak_page           # get page in $2
+  save_registers_1                # save registers 2/2 (delay)
+
+  lw $1, REG_SAVE($16)            # restore offset
+  lw $ra, REG_SAVE2($16)          # restore return address
+  lw $6, REG_SAVE3($16)           # restore a2
+  restore_registers               # restore registers
+
+1:
+  addu $2, $2, $1                 # add the memory map offset
 .endm
 
 
@@ -1275,19 +1338,10 @@ execute_load_oam_u8:
   load_u8 oam_ram, -1
 
 execute_load_gamepak8_u8:
-  translate_region_gamepak 8, patch_load_u8
-  load_u8 0, -4
-
 execute_load_gamepak9_u8:
-  translate_region_gamepak 9, patch_load_u8
-  load_u8 0, -4
-
 execute_load_gamepakA_u8:
-  translate_region_gamepak 10, patch_load_u8
-  load_u8 0, -4
-
 execute_load_gamepakB_u8:
-  translate_region_gamepak 11, patch_load_u8
+  translate_region_gamepak_mirror patch_load_u8
   load_u8 0, -4
 
 execute_load_gamepakC_u8:
@@ -1400,19 +1454,10 @@ execute_load_oam_s8:
   load_s8 oam_ram, -1
 
 execute_load_gamepak8_s8:
-  translate_region_gamepak 8, patch_load_s8
-  load_s8 0, -4
-
 execute_load_gamepak9_s8:
-  translate_region_gamepak 9, patch_load_s8
-  load_s8 0, -4
-
 execute_load_gamepakA_s8:
-  translate_region_gamepak 10, patch_load_s8
-  load_s8 0, -4
-
 execute_load_gamepakB_s8:
-  translate_region_gamepak 11, patch_load_s8
+  translate_region_gamepak_mirror patch_load_s8
   load_s8 0, -4
 
 execute_load_gamepakC_s8:
@@ -1534,19 +1579,10 @@ execute_load_oam_u16:
   load_u16 oam_ram, -1
 
 execute_load_gamepak8_u16:
-  translate_region_gamepak_align16 8, 1, 0, patch_load_u16
-  load_u16 0, -4
-
 execute_load_gamepak9_u16:
-  translate_region_gamepak_align16 9, 1, 0, patch_load_u16
-  load_u16 0, -4
-
 execute_load_gamepakA_u16:
-  translate_region_gamepak_align16 10, 1, 0, patch_load_u16
-  load_u16 0, -4
-
 execute_load_gamepakB_u16:
-  translate_region_gamepak_align16 11, 1, 0, patch_load_u16
+  translate_region_gamepak_mirror_align16 1, 0, patch_load_u16
   load_u16 0, -4
 
 execute_load_gamepakC_u16:
@@ -1649,19 +1685,10 @@ execute_load_oam_u16u:
   load_u16_unaligned oam_ram, -1
 
 execute_load_gamepak8_u16u:
-  translate_region_gamepak_align16 8, 1, 1, patch_load_u16
-  load_u16_unaligned 0, -4
-
 execute_load_gamepak9_u16u:
-  translate_region_gamepak_align16 9, 1, 1, patch_load_u16
-  load_u16_unaligned 0, -4
-
 execute_load_gamepakA_u16u:
-  translate_region_gamepak_align16 10, 1, 1, patch_load_u16
-  load_u16_unaligned 0, -4
-
 execute_load_gamepakB_u16u:
-  translate_region_gamepak_align16 11, 1, 1, patch_load_u16
+  translate_region_gamepak_mirror_align 1, 1, patch_load_u16
   load_u16_unaligned 0, -4
 
 execute_load_gamepakC_u16u:
@@ -1798,19 +1825,10 @@ execute_load_oam_s16:
   load_s16 oam_ram, -1
 
 execute_load_gamepak8_s16:
-  translate_region_gamepak_align16 8, 1, 0, patch_load_s16
-  load_s16 0, -4
-
 execute_load_gamepak9_s16:
-  translate_region_gamepak_align16 9, 1, 0, patch_load_s16
-  load_s16 0, -4
-
 execute_load_gamepakA_s16:
-  translate_region_gamepak_align16 10, 1, 0, patch_load_s16
-  load_s16 0, -4
-
 execute_load_gamepakB_s16:
-  translate_region_gamepak_align16 11, 1, 0, patch_load_s16
+  translate_region_gamepak_mirror_align16 1, 0, patch_load_s16
   load_s16 0, -4
 
 execute_load_gamepakC_s16:
@@ -1899,19 +1917,10 @@ execute_load_oam_s16u:
   load_s16_unaligned oam_ram, -1
 
 execute_load_gamepak8_s16u:
-  translate_region_gamepak_align 8, 1, 1, patch_load_s16
-  load_s16_unaligned 0, -4
-
 execute_load_gamepak9_s16u:
-  translate_region_gamepak_align 9, 1, 1, patch_load_s16
-  load_s16_unaligned 0, -4
-
 execute_load_gamepakA_s16u:
-  translate_region_gamepak_align 10, 1, 1, patch_load_s16
-  load_s16_unaligned 0, -4
-
 execute_load_gamepakB_s16u:
-  translate_region_gamepak_align 11, 1, 1, patch_load_s16
+  translate_region_gamepak_mirror_align 1, 1, patch_load_s16
   load_s16_unaligned 0, -4
 
 execute_load_gamepakC_s16u:
@@ -2045,19 +2054,10 @@ execute_load_oam_u32:
   load_u32 oam_ram, -2
 
 execute_load_gamepak8_u32:
-  translate_region_gamepak_align32 8, 2, 0, patch_load_u32
-  load_u32 0, -6
-
 execute_load_gamepak9_u32:
-  translate_region_gamepak_align32 9, 2, 0, patch_load_u32
-  load_u32 0, -6
-
 execute_load_gamepakA_u32:
-  translate_region_gamepak_align32 10, 2, 0, patch_load_u32
-  load_u32 0, -6
-
 execute_load_gamepakB_u32:
-  translate_region_gamepak_align32 11, 2, 0, patch_load_u32
+  translate_region_gamepak_mirror_align32 2, 0, patch_load_u32
   load_u32 0, -6
 
 execute_load_gamepakC_u32:
@@ -2156,19 +2156,10 @@ execute_load_oam_u32u1:
   load_u32_unaligned oam_ram, 1, -2
 
 execute_load_gamepak8_u32u1:
-  translate_region_gamepak_align32 8, 2, 1, patch_load_u32
-  load_u32_unaligned 0, 1, -6
-
 execute_load_gamepak9_u32u1:
-  translate_region_gamepak_align32 9, 2, 1, patch_load_u32
-  load_u32_unaligned 0, 1, -6
-
 execute_load_gamepakA_u32u1:
-  translate_region_gamepak_align32 10, 2, 1, patch_load_u32
-  load_u32_unaligned 0, 1, -6
-
 execute_load_gamepakB_u32u1:
-  translate_region_gamepak_align32 11, 2, 1, patch_load_u32
+  translate_region_gamepak_mirror_align32 2, 1, patch_load_u32
   load_u32_unaligned 0, 1, -6
 
 execute_load_gamepakC_u32u1:
@@ -2267,19 +2258,10 @@ execute_load_oam_u32u2:
   load_u32_unaligned oam_ram, 2, -2
 
 execute_load_gamepak8_u32u2:
-  translate_region_gamepak_align32 8, 2, 2, patch_load_u32
-  load_u32_unaligned 0, 2, -6
-
 execute_load_gamepak9_u32u2:
-  translate_region_gamepak_align32 9, 2, 2, patch_load_u32
-  load_u32_unaligned 0, 2, -6
-
 execute_load_gamepakA_u32u2:
-  translate_region_gamepak_align32 10, 2, 2, patch_load_u32
-  load_u32_unaligned 0, 2, -6
-
 execute_load_gamepakB_u32u2:
-  translate_region_gamepak_align32 11, 2, 2, patch_load_u32
+  translate_region_gamepak_mirror_align32 2, 2, patch_load_u32
   load_u32_unaligned 0, 2, -6
 
 execute_load_gamepakC_u32u2:
@@ -2377,19 +2359,10 @@ execute_load_oam_u32u3:
   load_u32_unaligned oam_ram, 3, -2
 
 execute_load_gamepak8_u32u3:
-  translate_region_gamepak_align32 8, 2, 3, patch_load_u32
-  load_u32_unaligned 0, 3, -6
-
 execute_load_gamepak9_u32u3:
-  translate_region_gamepak_align32 9, 2, 3, patch_load_u32
-  load_u32_unaligned 0, 3, -6
-
 execute_load_gamepakA_u32u3:
-  translate_region_gamepak_align32 10, 2, 3, patch_load_u32
-  load_u32_unaligned 0, 3, -6
-
 execute_load_gamepakB_u32u3:
-  translate_region_gamepak_align32 11, 2, 3, patch_load_u32
+  translate_region_gamepak_mirror_align32 2, 3, patch_load_u32
   load_u32_unaligned 0, 3, -6
 
 execute_load_gamepakC_u32u3:
@@ -2556,19 +2529,10 @@ execute_load_oam_u32a:
   load_u32 oam_ram, -2
 
 execute_load_gamepak8_u32a:
-  translate_region_gamepak_a 8, patch_load_u32a
-  load_u32 0, -4
-
 execute_load_gamepak9_u32a:
-  translate_region_gamepak_a 9, patch_load_u32a
-  load_u32 0, -4
-
 execute_load_gamepakA_u32a:
-  translate_region_gamepak_a 10, patch_load_u32a
-  load_u32 0, -4
-
 execute_load_gamepakB_u32a:
-  translate_region_gamepak_a 11, patch_load_u32a
+  translate_region_gamepak_mirror_a patch_load_u32a
   load_u32 0, -4
 
 execute_load_gamepakC_u32a:
