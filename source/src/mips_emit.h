@@ -144,6 +144,7 @@ typedef enum
 typedef enum
 {
   mips_regimm_bltz       = 0x00,
+  mips_regimm_bgez       = 0x01,
   mips_regimm_bltzal     = 0x10
 } MIPS_FUNCTION_REGIMM;
 
@@ -379,6 +380,10 @@ typedef enum
 
 #define mips_emit_bltzal(rs, offset)                                          \
   mips_emit_regimm(bltzal, rs, offset)                                        \
+
+#define mips_emit_bltz_filler(rs, writeback_location)                           \
+  (writeback_location) = translation_ptr;                                     \
+  mips_emit_regimm(bltz, rs, 0)                                               \
 
 #define mips_emit_nop()                                                       \
   mips_emit_sll(reg_zero, reg_zero, 0)                                        \
@@ -2017,9 +2022,26 @@ void force_user_mode_body(CPU_MODE_TYPE cpu_mode, CPU_MODE_TYPE new_mode)
                                                                               \
   if ((rn == REG_SP) && ((iwram_stack_optimize & option_stack_optimize) != 0))\
   {                                                                           \
+    u8 *iwram_stack_branch;                                                  \
+    u8 *iwram_stack_path;                                                     \
+    u8 *stack_base_done;                                                      \
+    u8 *skip_ewram_stack;                                                     \
+                                                                              \
+    mips_emit_srl(reg_temp, reg_a2, 24);                                      \
+    mips_emit_sll(reg_temp, reg_temp, 31);                                    \
+    mips_emit_bltz_filler(reg_temp, iwram_stack_branch);                      \
+    mips_emit_andi(reg_a1, reg_a2, 0x3FFFC);                                  \
+    generate_load_imm(reg_a0, (u32)ewram);                                    \
+    mips_emit_addu(reg_a1, reg_a1, reg_a0);                                   \
+    mips_emit_j_filler(skip_ewram_stack);                                     \
+    mips_emit_nop();                                                          \
+    iwram_stack_path = translation_ptr;                                       \
     mips_emit_andi(reg_a1, reg_a2, 0x7FFC);                                   \
     generate_load_imm(reg_a0, (u32)iwram);                                    \
     mips_emit_addu(reg_a1, reg_a1, reg_a0);                                   \
+    stack_base_done = translation_ptr;                                        \
+    generate_branch_patch_conditional(iwram_stack_branch, iwram_stack_path);    \
+    generate_branch_patch_unconditional(skip_ewram_stack, stack_base_done);     \
                                                                               \
     for (i = 0; i < 16; i++)                                                  \
     {                                                                         \
@@ -2439,9 +2461,26 @@ void force_user_mode_body(CPU_MODE_TYPE cpu_mode, CPU_MODE_TYPE new_mode)
                                                                               \
   if ((iwram_stack_optimize & option_stack_optimize) != 0)                    \
   {                                                                           \
+    u8 *iwram_stack_branch;                                                  \
+    u8 *iwram_stack_path;                                                     \
+    u8 *stack_base_done;                                                      \
+    u8 *skip_ewram_stack;                                                     \
+                                                                              \
+    mips_emit_srl(reg_temp, reg_a2, 24);                                      \
+    mips_emit_sll(reg_temp, reg_temp, 31);                                    \
+    mips_emit_bltz_filler(reg_temp, iwram_stack_branch);                      \
+    mips_emit_andi(reg_a1, reg_a2, 0x3FFFC);                                  \
+    generate_load_imm(reg_a0, (u32)ewram);                                    \
+    generate_add(reg_a1, reg_a0);                                             \
+    mips_emit_j_filler(skip_ewram_stack);                                     \
+    mips_emit_nop();                                                          \
+    iwram_stack_path = translation_ptr;                                       \
     mips_emit_andi(reg_a1, reg_a2, 0x7FFC);                                   \
     generate_load_imm(reg_a0, (u32)iwram);                                    \
     generate_add(reg_a1, reg_a0);                                             \
+    stack_base_done = translation_ptr;                                        \
+    generate_branch_patch_conditional(iwram_stack_branch, iwram_stack_path);    \
+    generate_branch_patch_unconditional(skip_ewram_stack, stack_base_done);     \
                                                                               \
     for (i = 0; i < 8; i++)                                                   \
     {                                                                         \
