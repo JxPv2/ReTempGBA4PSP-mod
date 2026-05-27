@@ -23,8 +23,7 @@
 #define GPSP_CONFIG_FILENAME  "tempgba.cfg"
 #define GPSP_CONFIG_NUM_GAMEPAD         16
 #define GPSP_CONFIG_NUM_PRE_EXTRA_SLOT  (18 + GPSP_CONFIG_NUM_GAMEPAD) // 34 words: options 0-17, gamepad 18-33
-#define GPSP_CONFIG_NUM_PRE_WINDOW_END  (19 + GPSP_CONFIG_NUM_GAMEPAD) // 35 words: + slot 18 = HBLANK cap, gamepad 19-34
-#define GPSP_CONFIG_NUM                 (20 + GPSP_CONFIG_NUM_GAMEPAD) // 36 words: slots 18-19 HBLANK win, gamepad 20-35
+#define GPSP_CONFIG_NUM                 (19 + GPSP_CONFIG_NUM_GAMEPAD) // 35 words: + slot 18 = HBLANK cap, gamepad 19-34
 #define GPSP_CONFIG_NUM_LEGACY          (17 + GPSP_CONFIG_NUM_GAMEPAD) // before renderer option
 #define GPSP_GAME_CONFIG_NUM  (7 + 16)
 
@@ -157,7 +156,7 @@ typedef struct _MenuType MenuType;
 
 #define SAVESTATE_OPTION(number)                                              \
 {                                                                             \
-  NULL,                                                                       \
+  menu_select_savestate,                                                      \
   NULL,                                                                       \
   NULL,                                                                       \
   savestate_timestamps[number],                                               \
@@ -1042,6 +1041,7 @@ u32 menu(void)
   auto void menu_screen_capture(void);
 
   auto void menu_change_state(void);
+  auto void menu_select_savestate(void);
   auto void menu_save_state(void);
   auto void menu_load_state(void);
   auto void menu_load_state_file(void);
@@ -1219,6 +1219,14 @@ u32 menu(void)
     }
   }
 
+  void menu_select_savestate(void)
+  {
+    if (savestate_action != 0)
+      menu_save_state();
+    else
+      menu_load_state();
+  }
+
   void menu_load_state_file(void)
   {
     const char *file_ext[] = { ".svs", NULL };
@@ -1256,8 +1264,7 @@ u32 menu(void)
 	option_screen_capture_format = 0;
 	option_enable_analog = 0;
 	option_analog_sensitivity = 4;
-	option_hblank_irq_window_start = 1;
-	option_hblank_irq_window_end = 160;
+	option_hblank_irq_cap = 160;
 	//int id_language;
 	sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);
 	if (id_language == PSP_SYSTEMPARAM_LANGUAGE_JAPANESE)
@@ -1638,17 +1645,15 @@ u32 menu(void)
 
     STRING_SELECTION_OPTION(menu_passive_ram_dynarec_policy, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], ram_dynarec_options, &option_ram_dynarec_policy, 3, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 9),
 
-    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_WIN_START], &option_hblank_irq_window_start, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START, 10),
+    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_CAP], &option_hblank_irq_cap, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP, 10),
 
-    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_WIN_END], &option_hblank_irq_window_end, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END, 11),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 11),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 12),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 12),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 13),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 13), 
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 14), 
-
-    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 15), 
+    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 14), 
 
     ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 16),
 
@@ -1860,9 +1865,6 @@ u32 menu(void)
       current_menu->init_function();
     }
 
-    if (current_menu == &savestate_menu)
-      submenu_savestate();
-
     if (current_menu && current_menu->options)
     {
       display_option = current_menu->options;
@@ -2052,13 +2054,6 @@ u32 menu(void)
                     menu_load_state_file();
                     break;
                   default:
-                    if (current_option->line_number < 10)
-                    {
-                      if (savestate_action != 0)
-                        menu_save_state();
-                      else
-                        menu_load_state();
-                    }
                     break;
                 }
               }
@@ -2374,12 +2369,11 @@ s32 save_config_file(void)
     file_options[15]  = option_enable_analog;
     file_options[16]  = option_analog_sensitivity;
     file_options[17] = option_language;
-    file_options[18] = option_hblank_irq_window_start % 228;
-    file_options[19] = option_hblank_irq_window_end % 228;
+    file_options[18] = option_hblank_irq_cap % 228;
 
     for (i = 0; i < 16; i++)
     {
-      file_options[20 + i] = gamepad_config_map[i];
+      file_options[19 + i] = gamepad_config_map[i];
     }
 
     FILE_WRITE_ARRAY(config_file, file_options);
@@ -2464,20 +2458,6 @@ s32 load_game_config_file(void)
   return -1;
 }
 
-static void load_hblank_irq_window_from_cap(u32 cap)
-{
-  if (cap == 0)
-  {
-    option_hblank_irq_window_start = 0;
-    option_hblank_irq_window_end = 0;
-  }
-  else
-  {
-    option_hblank_irq_window_start = 1;
-    option_hblank_irq_window_end = cap % 228;
-  }
-}
-
 s32 load_config_file(void)
 {
   SceUID config_file;
@@ -2533,63 +2513,7 @@ s32 load_config_file(void)
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
       option_language       = file_options[17] % 4;
-      option_hblank_irq_window_start = file_options[18] % 228;
-      option_hblank_irq_window_end = file_options[19] % 228;
-
-      for (i = 0; i < 16; i++)
-      {
-        gamepad_config_map[i] = file_options[20 + i] % (BUTTON_ID_NONE + 1);
-
-        if (gamepad_config_map[i] == BUTTON_ID_MENU)
-          menu_button = i;
-      }
-
-      if ((enable_home_menu == 0) && (menu_button == -1))
-        gamepad_config_map[0] = BUTTON_ID_MENU;
-
-      FILE_CLOSE(config_file);
-    }
-    else if (file_size == (GPSP_CONFIG_NUM_PRE_WINDOW_END * 4))
-    {
-      u32 i;
-      u32 file_options[file_size / 4];
-      s32 menu_button = -1;
-
-      FILE_READ_ARRAY(config_file, file_options);
-
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      psp_fps_debug       = file_options[3] % 2;
-      option_frameskip_type  = file_options[4] % 3;
-      option_frameskip_value = file_options[5];
-      option_clock_speed     = file_options[6] % 4;
-      option_sound_volume   = file_options[7] % 11;
-      option_stack_optimize = file_options[8] % 2;
-      {
-        u32 stored_ram_dynarec_policy = file_options[9];
-        if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
-        {
-          option_ram_dynarec_policy = stored_ram_dynarec_policy - 4;
-        }
-        else if (stored_ram_dynarec_policy <= 1)
-        {
-          option_ram_dynarec_policy = stored_ram_dynarec_policy + 1;
-        }
-        else
-        {
-          option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
-        }
-      }
-      option_video_renderer = file_options[10] % 2;
-      option_oam_hijacking_enabled = file_options[11] % 2;
-      option_boot_mode      = file_options[12] % 2;
-      option_update_backup  = file_options[13] % 2;
-      option_screen_capture_format = file_options[14] % 2;
-      option_enable_analog  = file_options[15] % 2;
-      option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 4;
-      load_hblank_irq_window_from_cap(file_options[18] % 228);
+      option_hblank_irq_cap = file_options[18] % 228;
 
       for (i = 0; i < 16; i++)
       {
@@ -2644,8 +2568,7 @@ s32 load_config_file(void)
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
       option_language       = file_options[17] % 4;
-      option_hblank_irq_window_start = 1;
-      option_hblank_irq_window_end = 160;
+      option_hblank_irq_cap = 160;
 
       for (i = 0; i < 16; i++)
       {
@@ -2706,8 +2629,7 @@ s32 load_config_file(void)
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
-      option_hblank_irq_window_start = 1;
-      option_hblank_irq_window_end = 160;
+      option_hblank_irq_cap = 160;
 
       FILE_CLOSE(config_file);
     }
@@ -2748,8 +2670,7 @@ s32 load_config_file(void)
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
-      option_hblank_irq_window_start = 1;
-      option_hblank_irq_window_end = 160;
+      option_hblank_irq_cap = 160;
 
       FILE_CLOSE(config_file);
     }
@@ -2773,8 +2694,7 @@ s32 load_config_file(void)
   option_screen_capture_format = 0;
   option_enable_analog = 0;
   option_analog_sensitivity = 4;
-  option_hblank_irq_window_start = 1;
-  option_hblank_irq_window_end = 160;
+  option_hblank_irq_cap = 160;
 
   int id_language;
   sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);

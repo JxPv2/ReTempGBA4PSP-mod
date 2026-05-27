@@ -216,17 +216,11 @@ const char *message[4][MSG_END] =
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     "\x81\xA8\x81\xA9" ":?I??   ?G?~?????[?^",
 
-    // MSG_OPTION_MENU_HBLANK_IRQ_WIN_START
-    "HBLANK IRQ start : %d",
+    // MSG_OPTION_MENU_HBLANK_IRQ_CAP
+    "HBLANK IRQ cap   : %d",
 
-    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START
-    "[<] [>] :Select   0=off  1=first line",
-
-    // MSG_OPTION_MENU_HBLANK_IRQ_WIN_END
-    "HBLANK IRQ end   : %d",
-
-    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END
-    "[<] [>] :Select   0=off  1-227=last line",
+    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
+    "[<] [>] :Select   0=off, max 227/frame",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-4s %2d:%02d:%02d",
@@ -593,15 +587,6 @@ const char *message[4][MSG_END] =
 
     // MSG_ERR_QUIT
     "?????{?^??????????I?????????B",
-
-    // MSG_LOAD_STATE_NO
-    "Load state slot: %d",
-
-    // MSG_SAVE_STATE_NO
-    "Save state slot: %d",
-
-    // MSG_YES_NO
-    "O: Yes    X: No",
 
     // MSG_BLANK
     ""

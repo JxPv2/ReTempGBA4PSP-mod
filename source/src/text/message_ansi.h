@@ -191,17 +191,11 @@
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     "[<] [>] :Select   emulator",
 
-    // MSG_OPTION_MENU_HBLANK_IRQ_WIN_START
-    "HBLANK IRQ start: %d",
+    // MSG_OPTION_MENU_HBLANK_IRQ_CAP
+    "HBLANK IRQ cap: %d",
 
-    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START
-    "[<] [>] :0=off  1=first scanline",
-
-    // MSG_OPTION_MENU_HBLANK_IRQ_WIN_END
-    "HBLANK IRQ end: %d",
-
-    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END
-    "[<] [>] :0=off  1-227=last scanline",
+    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
+    "[<] [>] :0=off  1-227=max IRQ/frame",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-3s %2d:%02d:%02d",
@@ -569,15 +563,6 @@
     // MSG_ERR_QUIT
     "Press any button to exit.",
 
-    // MSG_LOAD_STATE_NO
-    "Load state slot: %d",
-
-    // MSG_SAVE_STATE_NO
-    "Save state slot: %d",
-
-    // MSG_YES_NO
-    "O: Yes    X: No",
-
     // MSG_BLANK
     ""
   },
@@ -775,17 +760,11 @@
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":选择   模拟器配置",
 
-    // MSG_OPTION_MENU_HBLANK_IRQ_WIN_START
-    "HBLANK IRQ start: %d",
+    // MSG_OPTION_MENU_HBLANK_IRQ_CAP
+    "HBLANK IRQ cap: %d",
 
-    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START
-    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=关  1=首条扫描线",
-
-    // MSG_OPTION_MENU_HBLANK_IRQ_WIN_END
-    "HBLANK IRQ end: %d",
-
-    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END
-    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=关  1-227=末条扫描线",
+    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
+    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=关  1-227=每帧上限",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%02d/%02d %-4s %2d:%02d:%02d",
@@ -1153,15 +1132,6 @@
     // MSG_ERR_QUIT
     "请按任意键结束。",
 
-    // MSG_LOAD_STATE_NO
-    "读取即时存档槽: %d",
-
-    // MSG_SAVE_STATE_NO
-    "保存即时存档槽: %d",
-
-    // MSG_YES_NO
-    "O: 是    X: 否",
-
     // MSG_BLANK
     ""
   },
@@ -1359,17 +1329,11 @@
     // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
     FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":選擇   模擬器配置",
 
-    // MSG_OPTION_MENU_HBLANK_IRQ_WIN_START
-    "HBLANK IRQ start: %d",
+    // MSG_OPTION_MENU_HBLANK_IRQ_CAP
+    "HBLANK IRQ cap: %d",
 
-    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START
-    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=關  1=首條掃描線",
-
-    // MSG_OPTION_MENU_HBLANK_IRQ_WIN_END
-    "HBLANK IRQ end: %d",
-
-    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END
-    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=關  1-227=末條掃描線",
+    // MSG_OPTION_MENU_HELP_HBLANK_IRQ_CAP
+    FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=關  1-227=每幀上限",
 
     // MSG_STATE_MENU_DATE_FMT_0
     "%4d/%2d/%2d %-4s %2d:%02d:%02d",
@@ -1736,15 +1700,6 @@
 
     // MSG_ERR_QUIT
     "請按任意鍵結束。",
-
-    // MSG_LOAD_STATE_NO
-    "讀取即時存檔槽: %d",
-
-    // MSG_SAVE_STATE_NO
-    "保存即時存檔槽: %d",
-
-    // MSG_YES_NO
-    "O: 是    X: 否",
 
     // MSG_BLANK
     ""

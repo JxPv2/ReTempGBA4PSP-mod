@@ -39,8 +39,6 @@ s32 load_dir_cfg(char *file_name);
 
 u32 menu(void);
 
-extern u32 savestate_slot;
-
 void action_loadstate(void);
 void action_savestate(void);
 

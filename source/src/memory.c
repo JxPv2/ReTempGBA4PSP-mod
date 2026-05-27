@@ -89,13 +89,6 @@ u32 gamepak_size;
 // Picks a page to evict
 u32 page_time = 0;
 
-// Sticky ROM page bits (one bit per 32KB ROM page). Cleared each frame so hot
-// code/data pages are not evicted while the CPU is still using them.
-u32 gamepak_sticky_bit[1024 / 32];
-
-#define gamepak_sb_test(idx) \
-  (gamepak_sticky_bit[(idx) >> 5] & (1u << ((idx) & 31)))
-
 typedef struct
 {
   u32 page_timestamp;
@@ -280,38 +273,6 @@ static void init_memory_gamepak(void);
 
 static s32 load_gamepak_raw(char *name);
 static u32 evict_gamepak_page(void);
-
-static inline void touch_gamepak_page(u32 physical_index)
-{
-  u32 word = (physical_index >> 5) & 31;
-  u32 bit = physical_index & 31;
-
-  gamepak_sticky_bit[word] |= (1u << bit);
-}
-
-void clear_gamepak_stickybits(void)
-{
-  memset(gamepak_sticky_bit, 0, sizeof(gamepak_sticky_bit));
-}
-
-void gamepak_touch_mapped_page(u32 physical_index)
-{
-  u32 i;
-
-  if (gamepak_size <= gamepak_ram_buffer_size)
-    return;
-
-  touch_gamepak_page(physical_index);
-
-  for (i = 0; i < gamepak_ram_pages; i++)
-  {
-    if (gamepak_memory_map[i].physical_index == physical_index)
-    {
-      gamepak_memory_map[i].page_timestamp = page_time++;
-      return;
-    }
-  }
-}
 
 char backup_id[16];
 static void load_backup_id(void);
@@ -837,8 +798,6 @@ static u32 read32_oam_ram(u32 address)
                                                                               \
       if (read_rom_block == NULL)                                             \
         read_rom_block = load_gamepak_page(read_rom_region & 0x3FF);          \
-      else                                                                    \
-        gamepak_touch_mapped_page(read_rom_region & 0x3FF);                   \
     }                                                                         \
                                                                               \
     return ADDRESS##type(read_rom_block, address & 0x7FFF);                   \
@@ -2706,37 +2665,18 @@ CPU_ALERT_TYPE dma_transfer(DmaTransferType *dma)
 
 static u32 evict_gamepak_page(void)
 {
-  // Prefer evicting a non-sticky slot (LRU among those); if all are sticky,
-  // fall back to global LRU.
+  // Find the one with the smallest frame timestamp
   u32 page_index = 0;
   u32 physical_index;
-  u32 smallest;
+  u32 smallest = gamepak_memory_map[0].page_timestamp;
   u32 i;
-  u32 found = 0;
 
-  for (i = 0; i < gamepak_ram_pages; i++)
+  for (i = 1; i < gamepak_ram_pages; i++)
   {
-    if (gamepak_sb_test(gamepak_memory_map[i].physical_index))
-      continue;
-
-    if (!found || gamepak_memory_map[i].page_timestamp <= smallest)
+    if (gamepak_memory_map[i].page_timestamp <= smallest)
     {
       smallest = gamepak_memory_map[i].page_timestamp;
       page_index = i;
-      found = 1;
-    }
-  }
-
-  if (!found)
-  {
-    smallest = gamepak_memory_map[0].page_timestamp;
-    for (i = 1; i < gamepak_ram_pages; i++)
-    {
-      if (gamepak_memory_map[i].page_timestamp <= smallest)
-      {
-        smallest = gamepak_memory_map[i].page_timestamp;
-        page_index = i;
-      }
     }
   }
 
@@ -2773,8 +2713,6 @@ u8 *load_gamepak_page(u32 physical_index)
   if ((rtc_state != RTC_DISABLED) && (physical_index == 0))
     memcpy(swap_location + 0xC4, rtc_registers, sizeof(rtc_registers));
 
-  touch_gamepak_page(physical_index);
-
   return swap_location;
 }
 
@@ -2808,60 +2746,20 @@ static void init_memory_gamepak(void)
 
 void init_gamepak_buffer(void)
 {
-  /* Allocation strategy:
-   *   1. Try the large preferred sizes (32 MiB, then 16 MiB).
-   *   2. If 16 MiB fails, step down by 1 MiB at a time (15, 14, ...).
-   *      This mirrors gpSP-kai and avoids the previous cliff from 16 MiB
-   *      straight to 8 MiB, which forced 16 MiB ROMs (e.g. Fire Emblem:
-   *      The Sacred Stones) into paged mode and caused noticeable stalls
-   *      whenever new ROM pages were touched (phase-intro graphics,
-   *      battle transitions, etc.).
-   *   3. Final hard floor at 1 MiB. */
-  static const u32 MIN_BUFFER_SIZE  = 1 * 1024 * 1024;
-  static const u32 STEP_BUFFER_SIZE = 1 * 1024 * 1024;
-  static const u32 large_buffer_sizes[] =
+  gamepak_ram_buffer_size = 32 * 1024 * 1024;
+  gamepak_rom = (u8 *)memalign(MEM_ALIGN, gamepak_ram_buffer_size);
+
+  while (gamepak_rom == NULL)
   {
-    32 * 1024 * 1024,
-    16 * 1024 * 1024,
-  };
-  u32 i;
-  u32 size;
+    gamepak_ram_buffer_size >>= 1;
 
-  gamepak_rom = NULL;
-
-  /* Pass 1: large preferred sizes. */
-  for (i = 0; i < sizeof(large_buffer_sizes) / sizeof(large_buffer_sizes[0]); i++)
-  {
-    gamepak_ram_buffer_size = large_buffer_sizes[i];
-    gamepak_rom = (u8 *)memalign(MEM_ALIGN, gamepak_ram_buffer_size);
-
-    if (gamepak_rom != NULL)
-      break;
-  }
-
-  /* Pass 2: 1 MiB step-down from just below 16 MiB to the 1 MiB floor. */
-  if (gamepak_rom == NULL)
-  {
-    for (size = (16 * 1024 * 1024) - STEP_BUFFER_SIZE;
-         size >= MIN_BUFFER_SIZE;
-         size -= STEP_BUFFER_SIZE)
+    if (gamepak_ram_buffer_size == 0)
     {
-      gamepak_ram_buffer_size = size;
-      gamepak_rom = (u8 *)memalign(MEM_ALIGN, gamepak_ram_buffer_size);
-
-      if (gamepak_rom != NULL)
-        break;
-
-      /* size is unsigned; guard against underflow on the final step. */
-      if (size < MIN_BUFFER_SIZE + STEP_BUFFER_SIZE)
-        break;
+      error_msg(MSG[MSG_ERR_MALLOC], CONFIRMATION_QUIT);
+      quit();
     }
-  }
 
-  if (gamepak_rom == NULL)
-  {
-    error_msg(MSG[MSG_ERR_MALLOC], CONFIRMATION_QUIT);
-    quit();
+    gamepak_rom = (u8 *)memalign(MEM_ALIGN, gamepak_ram_buffer_size);
   }
 
   memset(gamepak_rom, 0, gamepak_ram_buffer_size);
@@ -2872,7 +2770,6 @@ void init_gamepak_buffer(void)
   gamepak_memory_map = (GamepakSwapEntryType *)safe_malloc(sizeof(GamepakSwapEntryType) * gamepak_ram_pages);
 
   memset(gamepak_memory_map, 0, sizeof(GamepakSwapEntryType) * gamepak_ram_pages);
-  clear_gamepak_stickybits();
 }
 
 
@@ -3714,17 +3611,6 @@ void load_state(char *savestate_filename)
 {
   SceUID savestate_file;
   char savestate_path[MAX_PATH];
-  char confirm_text[64];
-  u32 prev_sound_pause = sound_pause;
-
-  sprintf(confirm_text, MSG[MSG_LOAD_STATE_NO], (int)savestate_slot);
-  sound_pause = 1;
-  if (yesno_dialog(confirm_text) != 0)
-  {
-    sound_pause = prev_sound_pause;
-    return;
-  }
-  sound_pause = prev_sound_pause;
 
   sprintf(savestate_path, "%s%s", dir_state, savestate_filename);
 
@@ -3755,17 +3641,6 @@ void save_state(char *savestate_filename, u16 *screen_capture)
 {
   SceUID savestate_file;
   char savestate_path[MAX_PATH];
-  char confirm_text[64];
-  u32 prev_sound_pause = sound_pause;
-
-  sprintf(confirm_text, MSG[MSG_SAVE_STATE_NO], (int)savestate_slot);
-  sound_pause = 1;
-  if (yesno_dialog(confirm_text) != 0)
-  {
-    sound_pause = prev_sound_pause;
-    return;
-  }
-  sound_pause = prev_sound_pause;
 
   u8 *savestate_write_buffer;
 
