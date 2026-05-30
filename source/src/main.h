@@ -77,8 +77,9 @@ extern u32 option_frameskip_type;
 extern u32 option_frameskip_value;
 extern u32 option_clock_speed;
 
-/* Max HBLANK IRQ edges ORed into REG_IF per frame (0-227, 0 = off). Emulator option. */
-extern u32 option_hblank_irq_cap;
+/* HBLANK IRQ scanline window (1-based, 0 = off). Either 0 disables the window. */
+extern u32 option_hblank_irq_window_start;
+extern u32 option_hblank_irq_window_end;
 
 extern char main_path[MAX_PATH];
 
@@ -106,6 +107,8 @@ void reset_gba(void);
 void quit(void);
 
 void error_msg(const char *text, u8 confirm);
+/* Returns 0 to proceed (O), 1 to cancel (X). */
+u32 yesno_dialog(const char *text);
 void change_ext(char *src, char *buffer, const char *extension);
 
 u64 ticker(void);

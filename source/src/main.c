@@ -51,9 +51,8 @@ u32 option_frameskip_type = FRAMESKIP_AUTO;
 u32 option_frameskip_value = 9;
 u32 option_clock_speed = PSP_CLOCK_333;
 
-u32 option_hblank_irq_cap = 160;
-
-static u32 hblank_irq_raised_count;
+u32 option_hblank_irq_window_start = 1;
+u32 option_hblank_irq_window_end = 160;
 
 char main_path[MAX_PATH];
 
@@ -361,13 +360,20 @@ u32 update_gba(void)
         // H-blank interrupts do occur during v-blank (unlike hdma, which does not)
         if ((dispstat & 0x10) != 0)
         {
-          if (option_hblank_irq_cap == 0 ||
-              hblank_irq_raised_count < option_hblank_irq_cap)
+          u32 allow_hblank_irq = 1;
+
+          if (option_hblank_irq_window_start != 0 &&
+              option_hblank_irq_window_end != 0)
           {
-            irq_raised |= IRQ_HBLANK;
-            if (option_hblank_irq_cap != 0)
-              hblank_irq_raised_count++;
+            u32 scanline = vcount + 1;
+
+            allow_hblank_irq =
+              (scanline >= option_hblank_irq_window_start &&
+               scanline <= option_hblank_irq_window_end);
           }
+
+          if (allow_hblank_irq != 0)
+            irq_raised |= IRQ_HBLANK;
         }
       }
       else
@@ -430,9 +436,6 @@ u32 update_gba(void)
             flip_screen(0);
 
           vcount = 0;
-
-          if (option_hblank_irq_cap != 0)
-            hblank_irq_raised_count = 0;
         }
 
         if (vcount == (dispstat >> 8))
@@ -669,8 +672,6 @@ static void init_main(void)
 
   irq_ticks = 0;
   cpu_init_state = 0;
-
-  hblank_irq_raised_count = 0;
 
   if (!caches_inited)
   {
@@ -1047,6 +1048,39 @@ void error_msg(const char *text, u8 confirm)
   {
     gui_action = get_gui_input();
   }
+}
+
+u32 yesno_dialog(const char *text)
+{
+  GUI_ACTION_TYPE gui_action = CURSOR_NONE;
+  const u16 dlg_x1 = 72;
+  const u16 dlg_y1 = 96;
+  const u16 dlg_x2 = 407;
+  const u16 dlg_y2 = 176;
+
+  draw_box_fill(dlg_x1, dlg_y1, dlg_x2, dlg_y2, COLOR15_BLACK);
+  draw_box_line(dlg_x1, dlg_y1, dlg_x2, dlg_y2, COLOR15_WHITE);
+
+  if (option_language == 0)
+  {
+    print_string(text, X_POS_CENTER, dlg_y1 + 24, COLOR15_WHITE, COLOR15_BLACK);
+    print_string(MSG[MSG_YES_NO], X_POS_CENTER, dlg_y1 + 56, COLOR15_WHITE, COLOR15_BLACK);
+  }
+  else
+  {
+    print_string_gbk(text, X_POS_CENTER, dlg_y1 + 24, COLOR15_WHITE, COLOR15_BLACK);
+    print_string_gbk(MSG[MSG_YES_NO], X_POS_CENTER, dlg_y1 + 56, COLOR15_WHITE, COLOR15_BLACK);
+  }
+
+  flip_screen(1);
+
+  while ((gui_action != CURSOR_SELECT) && (gui_action != CURSOR_EXIT))
+  {
+    gui_action = get_gui_input();
+    sceKernelDelayThread(15000);
+  }
+
+  return (gui_action == CURSOR_SELECT) ? 0 : 1;
 }
 
 

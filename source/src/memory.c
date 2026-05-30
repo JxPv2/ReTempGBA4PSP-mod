@@ -3611,6 +3611,17 @@ void load_state(char *savestate_filename)
 {
   SceUID savestate_file;
   char savestate_path[MAX_PATH];
+  char confirm_text[64];
+  u32 prev_sound_pause = sound_pause;
+
+  sprintf(confirm_text, MSG[MSG_LOAD_STATE_NO], (int)savestate_slot);
+  sound_pause = 1;
+  if (yesno_dialog(confirm_text) != 0)
+  {
+    sound_pause = prev_sound_pause;
+    return;
+  }
+  sound_pause = prev_sound_pause;
 
   sprintf(savestate_path, "%s%s", dir_state, savestate_filename);
 
@@ -3641,6 +3652,17 @@ void save_state(char *savestate_filename, u16 *screen_capture)
 {
   SceUID savestate_file;
   char savestate_path[MAX_PATH];
+  char confirm_text[64];
+  u32 prev_sound_pause = sound_pause;
+
+  sprintf(confirm_text, MSG[MSG_SAVE_STATE_NO], (int)savestate_slot);
+  sound_pause = 1;
+  if (yesno_dialog(confirm_text) != 0)
+  {
+    sound_pause = prev_sound_pause;
+    return;
+  }
+  sound_pause = prev_sound_pause;
 
   u8 *savestate_write_buffer;
 
