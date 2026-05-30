@@ -41,8 +41,8 @@ u32 menu(void);
 
 extern u32 savestate_slot;
 
-void action_loadstate(void);
-void action_savestate(void);
+u32 action_loadstate(void);
+u32 action_savestate(void);
 
 
 #endif /* GUI_H */

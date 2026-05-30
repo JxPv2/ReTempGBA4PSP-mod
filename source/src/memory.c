@@ -3607,19 +3607,20 @@ s32 load_bios(char *name)
   sound_##type##_savestate(savestate_file);                                   \
   video_##type##_savestate(savestate_file);                                   \
 
-void load_state(char *savestate_filename)
+u32 load_state(char *savestate_filename)
 {
   SceUID savestate_file;
   char savestate_path[MAX_PATH];
   char confirm_text[64];
   u32 prev_sound_pause = sound_pause;
+  u32 result = 0;
 
   sprintf(confirm_text, MSG[MSG_LOAD_STATE_NO], (int)savestate_slot);
   sound_pause = 1;
   if (yesno_dialog(confirm_text) != 0)
   {
     sound_pause = prev_sound_pause;
-    return;
+    return 0;
   }
   sound_pause = prev_sound_pause;
 
@@ -3643,28 +3644,30 @@ void load_state(char *savestate_filename)
     oam_update = 1;
     gbc_sound_update = 1;
     reg[CHANGED_PC_STATUS] = 1;
+    result = 1;
   }
 
   scePowerUnlock(0);
+  return result;
 }
 
-void save_state(char *savestate_filename, u16 *screen_capture)
+u32 save_state(char *savestate_filename, u16 *screen_capture)
 {
   SceUID savestate_file;
   char savestate_path[MAX_PATH];
   char confirm_text[64];
   u32 prev_sound_pause = sound_pause;
+  u32 result = 0;
+  u8 *savestate_write_buffer;
 
   sprintf(confirm_text, MSG[MSG_SAVE_STATE_NO], (int)savestate_slot);
   sound_pause = 1;
   if (yesno_dialog(confirm_text) != 0)
   {
     sound_pause = prev_sound_pause;
-    return;
+    return 0;
   }
   sound_pause = prev_sound_pause;
-
-  u8 *savestate_write_buffer;
 
   sprintf(savestate_path, "%s%s", dir_state, savestate_filename);
 
@@ -3687,11 +3690,13 @@ void save_state(char *savestate_filename, u16 *screen_capture)
     SAVESTATE_BLOCK(write_mem);
     FILE_WRITE(savestate_file, savestate_write_buffer, SAVESTATE_SIZE);
     FILE_CLOSE(savestate_file);
+    result = 1;
   }
 
   scePowerUnlock(0);
 
   free(savestate_write_buffer);
+  return result;
 }
 
 

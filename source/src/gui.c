@@ -843,25 +843,27 @@ static void get_savestate_filename(u32 slot, char *name_buffer)
 }
 
 
-void action_loadstate(void)
+u32 action_loadstate(void)
 {
   char savestate_filename[MAX_FILE];
 
   get_savestate_filename(savestate_slot, savestate_filename);
-  load_state(savestate_filename);
+  return load_state(savestate_filename);
 }
 
-void action_savestate(void)
+u32 action_savestate(void)
 {
   char savestate_filename[MAX_FILE];
   u16 *current_screen;
+  u32 result;
 
   current_screen = copy_screen();
 
   get_savestate_filename(savestate_slot, savestate_filename);
-  save_state(savestate_filename, current_screen);
+  result = save_state(savestate_filename, current_screen);
 
   free(current_screen);
+  return result;
 }
 
 static u32 ram_dynarec_policy_menu_prev = ~(u32)0;
@@ -1042,8 +1044,8 @@ u32 menu(void)
   auto void menu_screen_capture(void);
 
   auto void menu_change_state(void);
-  auto void menu_save_state(void);
-  auto void menu_load_state(void);
+  auto u32 menu_save_state(void);
+  auto u32 menu_load_state(void);
   auto void menu_load_state_file(void);
 
   auto void menu_default(void);
@@ -1195,28 +1197,27 @@ u32 menu(void)
     screen_image_ptr = savestate_screen;
   }
 
-  void menu_save_state(void)
+  u32 menu_save_state(void)
   {
-    if (!first_load)
-    {
-      get_savestate_filename(savestate_slot, filename_buffer);
-      save_state(filename_buffer, current_screen);
+    if (first_load)
+      return 0;
 
-      get_savestate_info(filename_buffer, savestate_screen, line_buffer);
-      sprintf(savestate_timestamps[savestate_slot], "%d: %s", (int)savestate_slot, line_buffer);
-    }
+    get_savestate_filename(savestate_slot, filename_buffer);
+    if (save_state(filename_buffer, current_screen) == 0)
+      return 0;
+
+    get_savestate_info(filename_buffer, savestate_screen, line_buffer);
+    sprintf(savestate_timestamps[savestate_slot], "%d: %s", (int)savestate_slot, line_buffer);
+    return 1;
   }
 
-  void menu_load_state(void)
+  u32 menu_load_state(void)
   {
-    if (!first_load)
-    {
-      get_savestate_filename(savestate_slot, filename_buffer);
-      load_state(filename_buffer);
+    if (first_load)
+      return 0;
 
-      return_value = 1;
-      repeat = 0;
-    }
+    get_savestate_filename(savestate_slot, filename_buffer);
+    return load_state(filename_buffer);
   }
 
   void menu_load_state_file(void)
@@ -1225,9 +1226,11 @@ u32 menu(void)
 
     if ((load_file(file_ext, filename_buffer, dir_state) == 0) && !first_load)
     {
-      load_state(filename_buffer);
-      return_value = 1;
-      repeat = 0;
+      if (load_state(filename_buffer) != 0)
+      {
+        return_value = 1;
+        repeat = 0;
+      }
     }
     else
     {
@@ -2017,10 +2020,18 @@ u32 menu(void)
                 switch (current_option->line_number)
                 {
                   case 0:  // Load State
-                    action_loadstate();
+                    if (action_loadstate() != 0)
+                    {
+                      return_value = 1;
+                      repeat = 0;
+                    }
                     break;
-                  case 1:  // Save State  
-                    action_savestate();
+                  case 1:  // Save State
+                    if (action_savestate() != 0)
+                    {
+                      return_value = 1;
+                      repeat = 0;
+                    }
                     break;
                   case 4:  // Screen Capture
                     menu_screen_capture();
@@ -2052,6 +2063,14 @@ u32 menu(void)
                     menu_load_state_file();
                     break;
                   default:
+                    if (current_option->line_number < 10)
+                    {
+                      if ((savestate_action != 0 ? menu_save_state() : menu_load_state()) != 0)
+                      {
+                        return_value = 1;
+                        repeat = 0;
+                      }
+                    }
                     break;
                 }
               }
