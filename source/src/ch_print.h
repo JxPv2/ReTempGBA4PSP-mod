@@ -27,6 +27,13 @@
 #define FONT_CURSOR_DOWN_FILL_GBK  "\xA1\x4A"
 #define FONT_UP_DIRECTORY_GBK      "\xA1\x4B"
 
+#define FONT_BTN_TRIANGLE_GBK       "\xA1\xF7"
+#define FONT_BTN_SQUARE_GBK         "\xA1\xF5"
+#define FONT_BTN_CIRCLE_GBK         "\xA1\xF0"
+#define FONT_BTN_CROSS_GBK          "\xA1\xC1"
+#define FONT_BTN_TRIANGLE_FILL_GBK  "\xA1\xF8"
+#define FONT_BTN_SQUARE_FILL_GBK    "\xA1\xF6"
+#define FONT_BTN_CIRCLE_FILL_GBK    "\xA1\xF1"
 
 void ch_print(const char *str, u16 x, u16 y, u16 col, s16 bg_col, u16 *base_vram, u16 bufferwidth);
 

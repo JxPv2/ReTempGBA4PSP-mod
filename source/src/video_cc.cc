@@ -30,6 +30,10 @@ extern u32 option_oam_hijacking_enabled;  // Emulator option for OAM hijacking
 #define GBA_SCREEN_PITCH GBA_LINE_SIZE
 #endif
 
+/* #ifndef REG_MOSAIC
+#define REG_MOSAIC 0x04C
+#endif */
+
 #ifndef REG_BGxCNT
 #define REG_BGxCNT(layer) (REG_BG0CNT + (layer))
 #define REG_BGxHOFS(layer) (REG_BG0HOFS + ((layer) * 2))
@@ -1912,7 +1916,7 @@ static void order_layers(u32 layer_flags, u32 vcnt)
 // Here follow the mask value to separate/expand the color to 32 bit,
 // the mask to detect overflows in the blend operation and
 
-// TempGBA/PSP uses 5-5-5 channel semantics in the blend path.
+// ReTempGBA/PSP uses 5-5-5 channel semantics in the blend path.
 // Keep masks aligned with the proven C renderer (`video.c`) behavior.
 #define OVFG_MSK 0x04000000
 #define OVFR_MSK 0x00008000

@@ -4,7 +4,7 @@
  * Copyright (C) 2007 takka <takka@tfact.net>
  *
  * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public Licens e as
+ * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of
  * the License, or (at your option) any later version.
  *
@@ -20,35 +20,359 @@
 
 #include "common.h"
 
-#define GPSP_CONFIG_FILENAME  "tempgba.cfg"
+extern u32 option_swap_confirm_buttons;
+
+#define THEME_CONFIG_FILENAME "retempgba_theme.cfg"
+
+#define GPSP_CONFIG_FILENAME  "retempgba_config.cfg"
 #define GPSP_CONFIG_NUM_GAMEPAD         16
 #define GPSP_CONFIG_NUM_PRE_EXTRA_SLOT  (18 + GPSP_CONFIG_NUM_GAMEPAD) // 34 words: options 0-17, gamepad 18-33
 #define GPSP_CONFIG_NUM_PRE_WINDOW_END  (19 + GPSP_CONFIG_NUM_GAMEPAD) // 35 words: + slot 18 = HBLANK cap, gamepad 19-34
+#define GPSP_CONFIG_NUM_PRE_THEME       (20 + GPSP_CONFIG_NUM_GAMEPAD) // 36 words: slots 18-19 HBLANK win, gamepad 20-35
+#define GPSP_CONFIG_NUM_PRE_SWAP        (21 + GPSP_CONFIG_NUM_GAMEPAD) // 37 words: + theme slot 20, gamepad 21-36
 #define GPSP_CONFIG_NUM_PRE_VSYNC       (20 + GPSP_CONFIG_NUM_GAMEPAD) // 36 words: slots 18-19 HBLANK win, gamepad 20-35
-#define GPSP_CONFIG_NUM                 (21 + GPSP_CONFIG_NUM_GAMEPAD) // 37 words: slot 20 PSP VSync, gamepad 21-36
+#define GPSP_CONFIG_NUM                 (23 + GPSP_CONFIG_NUM_GAMEPAD) // 39 words: + swap slot 37, slot 20 PSP VSync, gamepad 21-36
 #define GPSP_CONFIG_NUM_LEGACY          (17 + GPSP_CONFIG_NUM_GAMEPAD) // before renderer option
 #define GPSP_GAME_CONFIG_NUM  (7 + 16)
 
-#define COLOR_BG            COLOR15( 3,  5,  8)
-#define COLOR_ROM_INFO      COLOR15(22, 18, 26)
-#define COLOR_ACTIVE_ITEM   COLOR15(31, 31, 31)
-#define COLOR_INACTIVE_ITEM COLOR15(13, 20, 18)
+/* Runtime theme colors — initialized to OG theme defaults */
+u16 color_bg            = COLOR15( 3,  5,  8);
+u16 color_rom_info      = COLOR15(22, 18, 26);
+u16 color_active_item   = COLOR15(31, 31, 31);
+u16 color_inactive_item = COLOR15(13, 20, 18);
+u16 color_tooltip_text  = COLOR15(18, 18, 18);
+u16 color_help_text     = COLOR15(16, 20, 24);
+u16 color_inactive_dir  = COLOR15(13, 22, 22);
+u16 color_scroll_bar    = COLOR15( 7,  9, 11);
+u16 color_batt_normal   = COLOR15(16, 20, 24);
+u16 color_batt_low      = COLOR15_YELLOW;
+u16 color_batt_charg    = COLOR15_GREEN;
 
-#define COLOR_HELP_TEXT     COLOR15(16, 20, 24)
-#define COLOR_INACTIVE_DIR  COLOR15(13, 22, 22)
-#define COLOR_SCROLL_BAR    COLOR15( 7,  9, 11)
+/* Global index for color picker — set before entering picker, read by file-scope function */
+u32 color_picker_item_index = 0;
 
-#define COLOR_BATT_NORMAL   COLOR_HELP_TEXT
-#define COLOR_BATT_LOW      COLOR15_YELLOW
-#define COLOR_BATT_CHARG    COLOR15_GREEN
+typedef struct {
+    u16 bg, rom_info, active_item, inactive_item;
+    u16 tooltip_text, help_text, inactive_dir, scroll_bar;
+    u16 batt_normal, batt_low, batt_charg;
+} ThemeColors;
 
-#define FILE_LIST_ROWS      (20)
-#define FILE_LIST_POS_X     (18)
-#define FILE_LIST_POS_Y     (16)
-#define DIR_LIST_POS_X      (360)
-#define PAGE_SCROLL_NUM     (10)
+static const ThemeColors theme_presets[9] = {
+    /* 0 OG   */     { COLOR15(3,5,8), COLOR15(22,18,26), COLOR15(31,31,31), COLOR15(13,20,18), COLOR15(18,18,18), COLOR15(16,20,24), COLOR15(13,22,22), COLOR15(7,9,11), COLOR15(16, 20, 24), COLOR15_YELLOW, COLOR15_GREEN },
+    /* 1 Dark */     { COLOR15(0,0,0), COLOR15(22,18,26), COLOR15(31,31,31), COLOR15(13,20,18), COLOR15(18,18,18), COLOR15(16,20,24), COLOR15(13,22,22), COLOR15(7,9,11), COLOR15(16,20,24), COLOR15_YELLOW, COLOR15_GREEN },
+    /* 2 Light */    { COLOR15(31,31,31), COLOR15(10,8,12), COLOR15(0,0,0), COLOR15(18,18,18), COLOR15(12,12,12), COLOR15(8,12,16), COLOR15(16,20,20), COLOR15(20,22,24), COLOR15(8,12,16), COLOR15(31,0,0), COLOR15(0,24,0) },
+    /* 3 Blue */     { COLOR15(0,0,8), COLOR15(20,18,26), COLOR15(31,31,31), COLOR15(10,15,22), COLOR15(12,16,22), COLOR15(12,18,26), COLOR15(10,18,24), COLOR15(6,10,14), COLOR15(12,18,26), COLOR15(31,31,0), COLOR15(0,31,0) },
+    /* 4 Green */    { COLOR15(0,6,0), COLOR15(18,26,18), COLOR15(31,31,31), COLOR15(10,20,10), COLOR15(12,22,12), COLOR15(12,24,12), COLOR15(10,22,10), COLOR15(6,12,6), COLOR15(12,24,12), COLOR15(31,31,0), COLOR15(0,31,0) },
+    /* 5 Red */      { COLOR15(8,0,0), COLOR15(26,18,18), COLOR15(31,31,31), COLOR15(20,10,10), COLOR15(24,12,12), COLOR15(24,14,14), COLOR15(22,10,10), COLOR15(14,6,6), COLOR15(24,14,14), COLOR15(31,31,0), COLOR15(0,31,0) },
+    /* 6 Purple */   { COLOR15(6,0,8), COLOR15(22,18,26), COLOR15(31,31,31), COLOR15(18,12,20), COLOR15(20,14,24), COLOR15(20,14,24), COLOR15(18,12,20), COLOR15(10,6,12), COLOR15(20,14,24), COLOR15(31,31,0), COLOR15(0,31,0) },
+    /* 7 Hi-Con */   { COLOR15(0,0,0), COLOR15(31,31,31), COLOR15(31,31,0), COLOR15(31,31,31), COLOR15(0,31,31), COLOR15(0,31,31), COLOR15(31,31,31), COLOR15(31,31,31), COLOR15(0,31,31), COLOR15(31,0,0), COLOR15(0,31,0) },
+    /* 8 Retro */    { COLOR15(0,0,0), COLOR15(0,22,0), COLOR15(0,31,0), COLOR15(0,18,0), COLOR15(0,20,0), COLOR15(0,24,0), COLOR15(0,18,0), COLOR15(0,10,0), COLOR15(0,24,0), COLOR15(31,31,0), COLOR15(0,31,0) },
+};
 
-#define MENU_LIST_POS_X     (18)
+static u16 get_preset_color(u32 theme, u32 item_index)
+{
+    if (theme >= 9) theme = 0;
+    switch (item_index)
+    {
+        case 0:  return theme_presets[theme].bg;
+        case 1:  return theme_presets[theme].rom_info;
+        case 2:  return theme_presets[theme].active_item;
+        case 3:  return theme_presets[theme].inactive_item;
+        case 4:  return theme_presets[theme].tooltip_text;
+        case 5:  return theme_presets[theme].help_text;
+        case 6:  return theme_presets[theme].inactive_dir;
+        case 7:  return theme_presets[theme].scroll_bar;
+        case 8:  return theme_presets[theme].batt_normal;
+        case 9:  return theme_presets[theme].batt_low;
+        case 10: return theme_presets[theme].batt_charg;
+    }
+    return 0;
+}
+
+void apply_theme(u32 theme)
+{
+    if (theme >= 9) theme = 0;
+
+    color_bg            = theme_presets[theme].bg;
+    color_rom_info      = theme_presets[theme].rom_info;
+    color_active_item   = theme_presets[theme].active_item;
+    color_inactive_item = theme_presets[theme].inactive_item;
+    color_tooltip_text  = theme_presets[theme].tooltip_text;
+    color_help_text     = theme_presets[theme].help_text;
+    color_inactive_dir  = theme_presets[theme].inactive_dir;
+    color_scroll_bar    = theme_presets[theme].scroll_bar;
+    color_batt_normal   = theme_presets[theme].batt_normal;
+    color_batt_low      = theme_presets[theme].batt_low;
+    color_batt_charg    = theme_presets[theme].batt_charg;
+
+    /* When a preset is chosen, delete custom theme so preset isn't overridden on boot */
+    {
+        char path[MAX_PATH];
+        sprintf(path, "%s%s", main_path, THEME_CONFIG_FILENAME);
+        sceIoRemove(path);
+    }
+}
+
+
+/* ------------------------------------------------------------------
+   Custom Color Picker
+   ------------------------------------------------------------------ */
+
+typedef struct {
+    u32 msg_index;
+    u16 *color_ptr;
+} ColorItem;
+
+static const ColorItem color_items[] = {
+    { MSG_CUSTOM_COLOR_BG,            &color_bg },
+    { MSG_CUSTOM_COLOR_ROM_INFO,      &color_rom_info },
+    { MSG_CUSTOM_COLOR_ACTIVE_ITEM,   &color_active_item },
+    { MSG_CUSTOM_COLOR_INACTIVE_ITEM, &color_inactive_item },
+    { MSG_CUSTOM_COLOR_TOOLTIP_TEXT,  &color_tooltip_text },
+    { MSG_CUSTOM_COLOR_HELP_TEXT,     &color_help_text },
+    { MSG_CUSTOM_COLOR_INACTIVE_DIR,  &color_inactive_dir },
+    { MSG_CUSTOM_COLOR_SCROLL_BAR,    &color_scroll_bar },
+    { MSG_CUSTOM_COLOR_BATT_NORMAL,   &color_batt_normal },
+    { MSG_CUSTOM_COLOR_BATT_LOW,      &color_batt_low },
+    { MSG_CUSTOM_COLOR_BATT_CHARG,    &color_batt_charg },
+};
+
+#define NUM_COLOR_ITEMS (sizeof(color_items) / sizeof(color_items[0]))
+
+#define PICKER_SV_X      10
+#define PICKER_SV_Y      40
+#define PICKER_SV_GRID   16
+#define PICKER_SV_CELL   8
+#define PICKER_SV_SIZE   (PICKER_SV_GRID * PICKER_SV_CELL)
+
+#define PICKER_HUE_X     (PICKER_SV_X + PICKER_SV_SIZE + 10)
+#define PICKER_HUE_Y     PICKER_SV_Y
+#define PICKER_HUE_W     16
+#define PICKER_HUE_SEGS  32
+#define PICKER_HUE_CELL  4
+#define PICKER_HUE_H     (PICKER_HUE_SEGS * PICKER_HUE_CELL)
+
+#define PICKER_PREV_X    (PICKER_HUE_X + PICKER_HUE_W + 10)
+#define PICKER_PREV_Y    PICKER_SV_Y
+#define PICKER_PREV_SIZE 36
+
+/* Theme preview panel — shows all UI elements in a miniature menu mockup */
+/* Theme preview panel — same size/position as the game screenshot window
+   (228,44) with 240x160 dimensions; literals used because SCREEN macros
+   are defined later in this file. */
+#define PREVIEW_PANEL_X  228
+#define PREVIEW_PANEL_Y  44
+#define PREVIEW_PANEL_W  240
+#define PREVIEW_PANEL_H  160
+
+
+/* ------------------------------------------------------------------
+   Global choice arrays (mutable pointers so they refresh with language)
+   ------------------------------------------------------------------ */
+static const char *scale_options[5];
+static const char *frameskip_options[3];
+static const char *stack_optimize_options[2];
+static const char *update_backup_options[2];
+static const char *yes_no_options[2];
+static const char *on_off_options[2];
+static const char *enable_disable_options[2];
+static const char *clock_speed_options[4];
+static const char *sound_volume_options[11];
+static const char *image_format_options[2];
+static const char *video_renderer_options[2];
+static const char *ram_dynarec_options[3];
+static const char *swap_button_options[2];
+static const char *theme_preset_options[9];
+static const char *language_option[5];
+static const char *gamepad_config_buttons[20];
+
+static void init_choice_arrays(void)
+{
+    scale_options[0] = MSG[MSG_SCN_SCALED_NONE];
+    scale_options[1] = MSG[MSG_SCN_SCALED_X15_GU];
+    scale_options[2] = MSG[MSG_SCN_SCALED_X15_SW];
+    scale_options[3] = MSG[MSG_SCN_SCALED_USER];
+    scale_options[4] = MSG[MSG_SCN_SCALED_16X9_GU];
+
+    frameskip_options[0] = MSG[MSG_AUTO];
+    frameskip_options[1] = MSG[MSG_MANUAL];
+    frameskip_options[2] = MSG[MSG_OFF];
+
+    stack_optimize_options[0] = MSG[MSG_OFF];
+    stack_optimize_options[1] = MSG[MSG_AUTO];
+
+    update_backup_options[0] = MSG[MSG_EXITONLY];
+    update_backup_options[1] = MSG[MSG_AUTO];
+
+    yes_no_options[0] = MSG[MSG_NO];
+    yes_no_options[1] = MSG[MSG_YES];
+
+    on_off_options[0] = MSG[MSG_OFF];
+    on_off_options[1] = MSG[MSG_ON];
+
+    enable_disable_options[0] = MSG[MSG_DISABLED];
+    enable_disable_options[1] = MSG[MSG_ENABLED];
+
+    clock_speed_options[0] = MSG[MSG_CLOCK_222];
+    clock_speed_options[1] = MSG[MSG_CLOCK_266];
+    clock_speed_options[2] = MSG[MSG_CLOCK_300];
+    clock_speed_options[3] = MSG[MSG_CLOCK_333];
+
+    sound_volume_options[0]  = MSG[MSG_VOL_0];
+    sound_volume_options[1]  = MSG[MSG_VOL_10];
+    sound_volume_options[2]  = MSG[MSG_VOL_20];
+    sound_volume_options[3]  = MSG[MSG_VOL_30];
+    sound_volume_options[4]  = MSG[MSG_VOL_40];
+    sound_volume_options[5]  = MSG[MSG_VOL_50];
+    sound_volume_options[6]  = MSG[MSG_VOL_60];
+    sound_volume_options[7]  = MSG[MSG_VOL_70];
+    sound_volume_options[8]  = MSG[MSG_VOL_80];
+    sound_volume_options[9]  = MSG[MSG_VOL_90];
+    sound_volume_options[10] = MSG[MSG_VOL_100];
+
+    image_format_options[0] = MSG[MSG_FMT_PNG];
+    image_format_options[1] = MSG[MSG_FMT_BMP];
+
+    video_renderer_options[0] = MSG[MSG_RENDERER_OLD];
+    video_renderer_options[1] = MSG[MSG_RENDERER_NEW];
+
+    ram_dynarec_options[0] = MSG[MSG_RAM_DYNAREC_FULL_FLUSH];
+    ram_dynarec_options[1] = MSG[MSG_RAM_DYNAREC_PARTIAL_NO_REUSE];
+    ram_dynarec_options[2] = MSG[MSG_RAM_DYNAREC_PARTIAL_WITH_REUSE];
+
+    swap_button_options[0] = MSG[MSG_SWAP_BUTTONS_O_CONFIRMS];
+    swap_button_options[1] = MSG[MSG_SWAP_BUTTONS_X_CONFIRMS];
+
+    theme_preset_options[0] = MSG[MSG_THEMES_OG];
+    theme_preset_options[1] = MSG[MSG_THEMES_DARK];
+    theme_preset_options[2] = MSG[MSG_THEMES_LIGHT];
+    theme_preset_options[3] = MSG[MSG_THEMES_BLUE];
+    theme_preset_options[4] = MSG[MSG_THEMES_GREEN];
+    theme_preset_options[5] = MSG[MSG_THEMES_RED];
+    theme_preset_options[6] = MSG[MSG_THEMES_PURPLE];
+    theme_preset_options[7] = MSG[MSG_THEMES_HIGH_CONTRAST];
+    theme_preset_options[8] = MSG[MSG_THEMES_RETRO];
+
+    language_option[0] = MSG[MSG_LANG_JAPANESE];
+    language_option[1] = MSG[MSG_LANG_ENGLISH];
+    language_option[2] = MSG[MSG_LANG_CHS];
+    language_option[3] = MSG[MSG_LANG_CHT];
+    language_option[4] = MSG[MSG_LANG_ITA];
+
+    gamepad_config_buttons[0]  = MSG[MSG_PAD_MENU_CFG_0];
+    gamepad_config_buttons[1]  = MSG[MSG_PAD_MENU_CFG_1];
+    gamepad_config_buttons[2]  = MSG[MSG_PAD_MENU_CFG_2];
+    gamepad_config_buttons[3]  = MSG[MSG_PAD_MENU_CFG_3];
+    gamepad_config_buttons[4]  = MSG[MSG_PAD_MENU_CFG_4];
+    gamepad_config_buttons[5]  = MSG[MSG_PAD_MENU_CFG_5];
+    gamepad_config_buttons[6]  = MSG[MSG_PAD_MENU_CFG_6];
+    gamepad_config_buttons[7]  = MSG[MSG_PAD_MENU_CFG_7];
+    gamepad_config_buttons[8]  = MSG[MSG_PAD_MENU_CFG_8];
+    gamepad_config_buttons[9]  = MSG[MSG_PAD_MENU_CFG_9];
+    gamepad_config_buttons[10] = MSG[MSG_PAD_MENU_CFG_10];
+    gamepad_config_buttons[11] = MSG[MSG_PAD_MENU_CFG_11];
+    gamepad_config_buttons[12] = MSG[MSG_PAD_MENU_CFG_12];
+    gamepad_config_buttons[13] = MSG[MSG_PAD_MENU_CFG_13];
+    gamepad_config_buttons[14] = MSG[MSG_PAD_MENU_CFG_14];
+    gamepad_config_buttons[15] = MSG[MSG_PAD_MENU_CFG_15];
+    gamepad_config_buttons[16] = MSG[MSG_PAD_MENU_CFG_16];
+    gamepad_config_buttons[17] = MSG[MSG_PAD_MENU_CFG_17];
+    gamepad_config_buttons[18] = MSG[MSG_PAD_MENU_CFG_18];
+    gamepad_config_buttons[19] = MSG[MSG_PAD_MENU_CFG_19];
+}
+
+static void refresh_choice_arrays(void)
+{
+    init_choice_arrays();
+}
+
+static void color15_to_rgb(u16 c, u8 *r, u8 *g, u8 *b)
+{
+    *r = (c >> 0) & 0x1F;
+    *g = (c >> 5) & 0x1F;
+    *b = (c >> 10) & 0x1F;
+}
+
+static u16 rgb_to_color15(u8 r, u8 g, u8 b)
+{
+    return (r & 0x1F) | ((g & 0x1F) << 5) | ((b & 0x1F) << 10);
+}
+
+#define C5TO8(v) (((v) << 3) | ((v) >> 2))
+#define C8TO5(v) ((v) >> 3)
+
+static void rgb15_to_hsv(u16 c, u32 *h, u32 *s, u32 *v)
+{
+    u8 r5, g5, b5;
+    color15_to_rgb(c, &r5, &g5, &b5);
+
+    u8 r = C5TO8(r5);
+    u8 g = C5TO8(g5);
+    u8 b = C5TO8(b5);
+
+    u8 max = r, min = r;
+    if (g > max) max = g;
+    if (b > max) max = b;
+    if (g < min) min = g;
+    if (b < min) min = b;
+
+    *v = max;
+
+    u8 delta = max - min;
+    if (max == 0) {
+        *s = 0;
+        *h = 0;
+        return;
+    }
+    *s = (delta * 255) / max;
+
+    if (delta == 0) {
+        *h = 0;
+    } else if (max == r) {
+        *h = (60 * ((int)g - (int)b) / delta + 360) % 360;
+    } else if (max == g) {
+        *h = (60 * ((int)b - (int)r) / delta + 120) % 360;
+    } else {
+        *h = (60 * ((int)r - (int)g) / delta + 240) % 360;
+    }
+}
+
+static u16 hsv_to_color15(u32 h, u32 s, u32 v)
+{
+    u8 r, g, b;
+    h = h % 360;
+
+    if (s == 0) {
+        r = g = b = v;
+    } else {
+        u32 hh = h / 60;
+        u32 f  = ((h % 60) * 255) / 60;
+        u32 p  = (v * (255 - s)) / 255;
+        u32 q  = (v * (255 - (s * f) / 255)) / 255;
+        u32 t  = (v * (255 - (s * (255 - f)) / 255)) / 255;
+
+        switch (hh) {
+            case 0:  r = v; g = t; b = p; break;
+            case 1:  r = q; g = v; b = p; break;
+            case 2:  r = p; g = v; b = t; break;
+            case 3:  r = p; g = q; b = v; break;
+            case 4:  r = t; g = p; b = v; break;
+            default: r = v; g = p; b = q; break;
+        }
+    }
+    return rgb_to_color15(C8TO5(r), C8TO5(g), C8TO5(b));
+}
+
+/* Forward declarations for status bar functions */
+static void update_status_string(char *time_str, char *batt_str, u16 *color_batt);
+static void update_status_string_gbk(char *time_str, char *batt_str, u16 *color_batt);
+static void draw_status_bar(void);
+
+/* Forward declaration for color reset */
+void menu_reset_single_color(u32 idx);
+
+#define TEXT_TOOLTIP_POS_Y     (210)
+#define MENU_LIST_POS_X     (10) //18 default
 
 #define SCREEN_IMAGE_POS_X  (228)
 #define SCREEN_IMAGE_POS_Y  (44)
@@ -56,6 +380,422 @@
 #define BATT_STATUS_POS_X   (PSP_SCREEN_WIDTH - (FONTWIDTH * 14))  // 396
 #define TIME_STATUS_POS_X   (BATT_STATUS_POS_X - (FONTWIDTH * 22)) // 264
 #define DIR_NAME_LENGTH     ((TIME_STATUS_POS_X / FONTWIDTH) - 2)  // 42
+
+
+static void draw_theme_preview(u16 editing_color_ptr_value)
+{
+    u32 px = PREVIEW_PANEL_X;
+    u32 py = PREVIEW_PANEL_Y;
+    u32 pw = PREVIEW_PANEL_W;   /* 240 */
+    u32 ph = PREVIEW_PANEL_H;   /* 160 */
+
+    /* Background fills the whole preview area */
+    draw_box_fill(px, py, px + pw - 1, py + ph - 1, color_bg);
+    draw_box_line(px - 1, py - 1, px + pw, py + ph, color_inactive_item);
+
+    /* Title bar at top */
+    if (option_language == 0)
+        print_string(MSG[MSG_PREVIEW_TITLE], px + 6, py + 4, color_rom_info, BG_NO_FILL);
+    else
+        print_string_gbk(MSG[MSG_PREVIEW_TITLE], px + 6, py + 4, color_rom_info, BG_NO_FILL);
+
+    /* Menu items — simulate a list with one active, rest inactive */
+    /* Scaled for 240x160: 5 items, ~20px each */
+    u32 item_y = py + 20;
+    u32 item_h = 18;
+    const char *fake_items[] = {
+        MSG[MSG_PREVIEW_ITEM_0],
+        MSG[MSG_PREVIEW_ITEM_1],
+        MSG[MSG_PREVIEW_ITEM_2],
+        MSG[MSG_PREVIEW_ITEM_3],
+        MSG[MSG_PREVIEW_ITEM_4]
+    };
+    u32 num_fake = 5;
+    u32 active_idx = 2;  /* "Settings" is highlighted */
+
+    for (u32 i = 0; i < num_fake; i++)
+    {
+        u16 item_color = (i == active_idx) ? color_active_item : color_inactive_item;
+        if (option_language == 0)
+            print_string(fake_items[i], px + 10, item_y + i * item_h, item_color, BG_NO_FILL);
+        else
+            print_string_gbk(fake_items[i], px + 10, item_y + i * item_h, item_color, BG_NO_FILL);
+    }
+
+    /* Scroll bar on the left edge */
+    draw_box_fill(px + 2, py + 18, px + 6, py + ph - 18, color_scroll_bar);
+
+    /* Battery indicator in top-right corner — reflects the state being edited */
+    {
+        u16 batt_color = color_batt_normal;
+        const char *batt_text = FONT_BATTERY2_GBK " 69%";
+
+        if (editing_color_ptr_value != 0xFFFF)
+        {
+            if (color_picker_item_index == 9) {          /* Battery low */
+                batt_color = color_batt_low;
+                batt_text = FONT_BATTERY0_GBK " 12%";
+            } else if (color_picker_item_index == 10) {  /* Battery charging */
+                batt_color = color_batt_charg;
+                batt_text = FONT_BATTERY3_GBK " 96%";
+            } else {
+                batt_color = color_batt_normal;
+            }
+        }
+
+        print_string_gbk(batt_text, px + pw - 50, py + 4, batt_color, BG_NO_FILL);
+    }
+
+    /* Directory entries on the right side under battery */
+    u32 dir_x = px + pw - 70;
+    u32 dir_y = py + 20;
+    if (option_language == 0)
+    {
+        print_string("..", dir_x, dir_y, color_inactive_dir, BG_NO_FILL);
+        print_string("[ROMs]", dir_x, dir_y + 14, color_inactive_dir, BG_NO_FILL);
+    }
+    else
+    {
+        print_string_gbk("..", dir_x, dir_y, color_inactive_dir, BG_NO_FILL);
+        print_string_gbk("[ROMs]", dir_x, dir_y + 14, color_inactive_dir, BG_NO_FILL);
+    }
+
+    /* Tooltip */
+    u32 tooltip_y = py + ph - 40;
+    if (option_language == 0)
+        print_string(MSG[MSG_PREVIEW_ITEM_TOOLTIP], px + 10, tooltip_y, color_tooltip_text, BG_NO_FILL);
+    else
+        print_string_gbk(MSG[MSG_PREVIEW_ITEM_TOOLTIP], px + 10, tooltip_y, color_tooltip_text, BG_NO_FILL);
+
+    /* Help bar at bottom — button symbols embedded in MSG, print_swap_aware swaps them */
+    print_swap_aware(MSG[MSG_PREVIEW_ITEM_HELP], px + 15, py + ph - 16, color_help_text, BG_NO_FILL);
+}
+
+
+/* Swap-aware print: copies src to a temp buffer while swapping GBK Circle (0xA1 0xF0)
+   and Cross (0xA1 0xC1) symbols based on option_swap_confirm_buttons. */
+void print_swap_aware(const char *src, u32 x, u32 y, u16 color, u16 bg)
+{
+    char buf[256];
+    char *dst = buf;
+    const char *s = src;
+
+    while (*s != '\0' && dst < buf + sizeof(buf) - 3)
+    {
+        if ((u8)s[0] == 0xA1 && (u8)s[1] == 0xF0)
+        {
+            *dst++ = '\xA1';
+            *dst++ = option_swap_confirm_buttons ? '\xC1' : '\xF0';
+            s += 2;
+        }
+        else if ((u8)s[0] == 0xA1 && (u8)s[1] == 0xC1)
+        {
+            *dst++ = '\xA1';
+            *dst++ = option_swap_confirm_buttons ? '\xF0' : '\xC1';
+            s += 2;
+        }
+        else
+        {
+            *dst++ = *s++;
+        }
+    }
+    *dst = '\0';
+
+    if (option_language == 0)
+        print_string(buf, x, y, color, bg);
+    else
+        print_string_gbk(buf, x, y, color, bg);
+}
+
+static void draw_color_picker(u32 h, u32 s, u32 v, s32 cx, s32 cy, s32 hue_seg,
+                              u16 original_color, u16 current_color, u32 title_msg_idx)
+{
+    u32 gx, gy, px, py;
+    u16 c;
+
+    clear_screen(COLOR15_TO_32(color_bg));
+
+    /* Title */
+    if (option_language == 0)
+        print_string(MSG[title_msg_idx], 10, 10, color_active_item, BG_NO_FILL);
+    else
+        print_string_gbk(MSG[title_msg_idx], 10, 10, color_active_item, BG_NO_FILL);
+
+    /* SV square (Saturation x Value) */
+    for (gy = 0; gy < PICKER_SV_GRID; gy++)
+    {
+        for (gx = 0; gx < PICKER_SV_GRID; gx++)
+        {
+            u32 gs = (gx * 255) / (PICKER_SV_GRID - 1);
+            u32 gv = ((PICKER_SV_GRID - 1 - gy) * 255) / (PICKER_SV_GRID - 1);
+            c  = hsv_to_color15(h, gs, gv);
+            px = PICKER_SV_X + gx * PICKER_SV_CELL;
+            py = PICKER_SV_Y + gy * PICKER_SV_CELL;
+            draw_box_fill(px, py, px + PICKER_SV_CELL - 1, py + PICKER_SV_CELL - 1, c);
+        }
+    }
+
+    draw_box_line(PICKER_SV_X - 1, PICKER_SV_Y - 1,
+                  PICKER_SV_X + PICKER_SV_SIZE, PICKER_SV_Y + PICKER_SV_SIZE,
+                  COLOR15_WHITE);
+
+    /* Cursor on SV square */
+    px = PICKER_SV_X + cx * PICKER_SV_CELL;
+    py = PICKER_SV_Y + cy * PICKER_SV_CELL;
+    draw_box_line(px - 1, py - 1, px + PICKER_SV_CELL,     py + PICKER_SV_CELL,     COLOR15_WHITE);
+    draw_box_line(px - 2, py - 2, px + PICKER_SV_CELL + 1, py + PICKER_SV_CELL + 1, 0);
+
+    /* Hue bar */
+    for (gy = 0; gy < PICKER_HUE_SEGS; gy++)
+    {
+        u32 hh = (gy * 360) / PICKER_HUE_SEGS;
+        c  = hsv_to_color15(hh, 255, 255);
+        py = PICKER_HUE_Y + gy * PICKER_HUE_CELL;
+        draw_box_fill(PICKER_HUE_X, py, PICKER_HUE_X + PICKER_HUE_W - 1, py + PICKER_HUE_CELL - 1, c);
+    }
+
+    draw_box_line(PICKER_HUE_X - 1, PICKER_HUE_Y - 1,
+                  PICKER_HUE_X + PICKER_HUE_W, PICKER_HUE_Y + PICKER_HUE_H,
+                  COLOR15_WHITE);
+
+    /* Hue cursor */
+    py = PICKER_HUE_Y + hue_seg * PICKER_HUE_CELL;
+    draw_hline(PICKER_HUE_X - 4, PICKER_HUE_X + PICKER_HUE_W + 3, py, COLOR15_WHITE);
+    draw_hline(PICKER_HUE_X - 4, PICKER_HUE_X + PICKER_HUE_W + 3, py + PICKER_HUE_CELL - 1, COLOR15_WHITE);
+
+    /* Preview: original */
+    draw_box_fill(PICKER_PREV_X, PICKER_PREV_Y,
+                  PICKER_PREV_X + PICKER_PREV_SIZE - 1,
+                  PICKER_PREV_Y + PICKER_PREV_SIZE - 1, original_color);
+    draw_box_line(PICKER_PREV_X - 1, PICKER_PREV_Y - 1,
+                  PICKER_PREV_X + PICKER_PREV_SIZE,
+                  PICKER_PREV_Y + PICKER_PREV_SIZE, COLOR15_WHITE);
+
+    /* Preview: current */
+    draw_box_fill(PICKER_PREV_X, PICKER_PREV_Y + PICKER_PREV_SIZE + 20,
+                  PICKER_PREV_X + PICKER_PREV_SIZE - 1,
+                  PICKER_PREV_Y + PICKER_PREV_SIZE * 2 + 19, current_color);
+    draw_box_line(PICKER_PREV_X - 1, PICKER_PREV_Y + PICKER_PREV_SIZE + 19,
+                  PICKER_PREV_X + PICKER_PREV_SIZE,
+                  PICKER_PREV_Y + PICKER_PREV_SIZE * 2 + 20, COLOR15_WHITE);
+
+    /* Labels */
+    if (option_language == 0)
+    {
+        print_string(MSG[MSG_PICKER_OLD], PICKER_PREV_X, PICKER_PREV_Y + PICKER_PREV_SIZE + 3, color_help_text, BG_NO_FILL);
+        print_string(MSG[MSG_PICKER_NEW], PICKER_PREV_X, PICKER_PREV_Y + PICKER_PREV_SIZE * 2 + 23, color_help_text, BG_NO_FILL);
+        print_string(MSG[MSG_PICKER_CONTROLS], 25, 180, color_help_text, BG_NO_FILL);
+        print_string(MSG[MSG_CUSTOM_COLOR_HELP_ITEM], 30, 258, color_help_text, BG_NO_FILL);
+    }
+    else
+    {
+        print_string_gbk(MSG[MSG_PICKER_OLD], PICKER_PREV_X, PICKER_PREV_Y + PICKER_PREV_SIZE + 3, color_help_text, BG_NO_FILL);
+        print_string_gbk(MSG[MSG_PICKER_NEW], PICKER_PREV_X, PICKER_PREV_Y + PICKER_PREV_SIZE * 2 + 23, color_help_text, BG_NO_FILL);
+        print_string_gbk(MSG[MSG_PICKER_CONTROLS], 25, 180, color_help_text, BG_NO_FILL);
+        print_string_gbk(MSG[MSG_CUSTOM_COLOR_HELP_ITEM], 30, 258, color_help_text, BG_NO_FILL);
+    }
+
+    /* Live theme preview panel */
+    draw_theme_preview(current_color);
+}
+
+static void draw_status_bar(void)
+{
+    static char time_str[40];
+    static char batt_str[40];
+    u16 color_batt_life = color_batt_normal;
+    static u32 status_counter = 0;
+
+    if ((status_counter % 30) == 0)
+    {
+        if (option_language == 0)
+            update_status_string(time_str, batt_str, &color_batt_life);
+        else
+            update_status_string_gbk(time_str, batt_str, &color_batt_life);
+    }
+    status_counter++;
+
+    if (option_language == 0)
+    {
+        print_string(time_str, TIME_STATUS_POS_X, 2, color_help_text, BG_NO_FILL);
+        print_string(batt_str, BATT_STATUS_POS_X, 2, color_batt_life, BG_NO_FILL);
+    }
+    else
+    {
+        print_string_gbk(time_str, TIME_STATUS_POS_X, 2, color_help_text, BG_NO_FILL);
+        print_string_gbk(batt_str, BATT_STATUS_POS_X, 2, color_batt_life, BG_NO_FILL);
+    }
+}
+
+static u16 run_color_picker(u16 *color_ptr, u32 title_msg_idx)
+{
+    u32 h, s, v;
+    rgb15_to_hsv(*color_ptr, &h, &s, &v);
+
+    s32 cx = (s * (PICKER_SV_GRID - 1)) / 255;
+    s32 cy = ((255 - v) * (PICKER_SV_GRID - 1)) / 255;
+    s32 hue_seg = (h * PICKER_HUE_SEGS) / 360;
+
+    u16 original_color = *color_ptr;
+    u16 current_color  = *color_ptr;
+    GUI_ACTION_TYPE gui_action;
+    u32 repeat = 1;
+
+    while (repeat)
+    {
+        h = (hue_seg * 360) / PICKER_HUE_SEGS;
+        s = (cx * 255) / (PICKER_SV_GRID - 1);
+        v = ((PICKER_SV_GRID - 1 - cy) * 255) / (PICKER_SV_GRID - 1);
+        current_color = hsv_to_color15(h, s, v);
+
+        /* Live preview: write to global immediately so UI elements update */
+        *color_ptr = current_color;
+
+        draw_color_picker(h, s, v, cx, cy, hue_seg, original_color, current_color, title_msg_idx);
+        draw_status_bar();
+        flip_screen(1);
+
+        gui_action = get_gui_input();
+
+        switch (gui_action)
+        {
+            case CURSOR_LEFT:
+                if (cx > 0) cx--;
+                break;
+            case CURSOR_RIGHT:
+                if (cx < PICKER_SV_GRID - 1) cx++;
+                break;
+            case CURSOR_UP:
+                if (cy > 0) cy--;
+                break;
+            case CURSOR_DOWN:
+                if (cy < PICKER_SV_GRID - 1) cy++;
+                break;
+            case CURSOR_LTRIGGER:
+                if (hue_seg > 0) hue_seg--;
+                else hue_seg = PICKER_HUE_SEGS - 1;
+                break;
+            case CURSOR_RTRIGGER:
+                hue_seg = (hue_seg + 1) % PICKER_HUE_SEGS;
+                break;
+            case CURSOR_SELECT:
+                *color_ptr = current_color;
+                return current_color;
+            case CURSOR_EXIT:
+                return original_color;
+            case CURSOR_BACK:
+                /* Square: reset to preset default instead of canceling */
+                {
+                  u16 preset = get_preset_color(option_theme, color_picker_item_index);
+                  *color_ptr = preset;
+                  rgb15_to_hsv(preset, &h, &s, &v);
+                  cx = (s * (PICKER_SV_GRID - 1)) / 255;
+                  cy = ((255 - v) * (PICKER_SV_GRID - 1)) / 255;
+                  hue_seg = (h * PICKER_HUE_SEGS) / 360;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    *color_ptr = original_color;
+    return original_color;
+}
+
+/* Reset single color to its preset default (Square / CURSOR_BACK in Custom Colors list) */
+void menu_reset_single_color(u32 idx)
+{
+    if (idx >= NUM_COLOR_ITEMS)
+        return;
+
+    u16 preset_color = get_preset_color(option_theme, idx);
+    *color_items[idx].color_ptr = preset_color;
+    save_theme_config();
+}
+
+/* File-scope color picker entry — no nested function, uses global index */
+void menu_pick_color(void)
+{
+    u16 *target = color_items[color_picker_item_index].color_ptr;
+    u32 title   = color_items[color_picker_item_index].msg_index;
+    run_color_picker(target, title);
+    save_theme_config();
+}
+
+s32 save_theme_config(void)
+{
+    SceUID fd;
+    char path[MAX_PATH];
+    sprintf(path, "%s%s", main_path, THEME_CONFIG_FILENAME);
+
+    scePowerLock(0);
+    FILE_OPEN(fd, path, WRITE);
+
+    if (FILE_CHECK_VALID(fd))
+    {
+        u16 colors[11] = {
+            color_bg, color_rom_info, color_active_item, color_inactive_item,
+            color_tooltip_text, color_help_text, color_inactive_dir, color_scroll_bar,
+            color_batt_normal, color_batt_low, color_batt_charg
+        };
+        FILE_WRITE(fd, colors, sizeof(colors));
+        FILE_CLOSE(fd);
+        scePowerUnlock(0);
+        return 0;
+    }
+
+    scePowerUnlock(0);
+    return -1;
+}
+
+s32 load_theme_config(void)
+{
+    SceUID fd;
+    char path[MAX_PATH];
+    sprintf(path, "%s%s", main_path, THEME_CONFIG_FILENAME);
+
+    scePowerLock(0);
+    FILE_OPEN(fd, path, READ);
+
+    if (FILE_CHECK_VALID(fd))
+    {
+        u16 colors[11];
+        s32 read_len = FILE_READ(fd, colors, sizeof(colors));
+        FILE_CLOSE(fd);
+        scePowerUnlock(0);
+
+        if (read_len == sizeof(colors))
+        {
+            color_bg            = colors[0];
+            color_rom_info      = colors[1];
+            color_active_item   = colors[2];
+            color_inactive_item = colors[3];
+            color_tooltip_text     = colors[4];
+            color_help_text     = colors[5];
+            color_inactive_dir  = colors[6];
+            color_scroll_bar    = colors[7];
+            color_batt_normal   = colors[8];
+            color_batt_low      = colors[9];
+            color_batt_charg    = colors[10];
+            return 0;
+        }
+    }
+    else
+    {
+        scePowerUnlock(0);
+    }
+
+    return -1;
+}
+
+#define FILE_LIST_ROWS      (20)
+#define FILE_LIST_POS_X     (10) //18 default
+#define FILE_LIST_POS_Y     (16)
+#define DIR_LIST_POS_X      (360)
+#define PAGE_SCROLL_NUM     (10)
+
+
 
 // scroll bar
 #define SBAR_X1  (2)
@@ -100,6 +840,8 @@ struct _MenuOptionType
   u32 help_string;
   u32 line_number;
   MENU_OPTION_TYPE_ENUM option_type;
+  u32 tooltip_string;   // MSG index for tooltip, 0 = none
+  u32 display_msg;      // MSG index for display_string, 0 = dynamic
 };
 
 typedef struct _MenuOptionType MenuOptionType;
@@ -114,7 +856,7 @@ typedef struct _MenuType MenuType;
     sizeof(name##_options) / sizeof(MenuOptionType)                           \
   }                                                                           \
 
-#define GAMEPAD_CONFIG_OPTION(display_string, number)                         \
+#define GAMEPAD_CONFIG_OPTION(display_string, number, display_msg)            \
 {                                                                             \
   NULL,                                                                       \
   NULL,                                                                       \
@@ -125,10 +867,12 @@ typedef struct _MenuType MenuType;
   sizeof(gamepad_config_buttons) / sizeof(gamepad_config_buttons[0]),         \
   MSG_PAD_MENU_HELP_0,                                                        \
   number,                                                                     \
-  STRING_SELECTION_OPTION                                                     \
+  STRING_SELECTION_OPTION,                                                    \
+  0,                                                                          \
+  display_msg                                                                 \
 }                                                                             \
 
-#define ANALOG_CONFIG_OPTION(display_string, number)                          \
+#define ANALOG_CONFIG_OPTION(display_string, number, display_msg)             \
 {                                                                             \
   NULL,                                                                       \
   NULL,                                                                       \
@@ -139,7 +883,9 @@ typedef struct _MenuType MenuType;
   sizeof(gamepad_config_buttons) / sizeof(gamepad_config_buttons[0]),         \
   MSG_PAD_MENU_HELP_0,                                                        \
   number,                                                                     \
-  STRING_SELECTION_OPTION                                                     \
+  STRING_SELECTION_OPTION,                                                    \
+  0,                                                                          \
+  display_msg                                                                 \
 }                                                                             \
 
 #define CHEAT_OPTION(number)                                                  \
@@ -153,7 +899,9 @@ typedef struct _MenuType MenuType;
   2,                                                                          \
   MSG_CHEAT_MENU_HELP_0,                                                      \
   (number) % 10,                                                              \
-  STRING_SELECTION_OPTION                                                     \
+  STRING_SELECTION_OPTION,                                                    \
+  0,                                                                          \
+  0                                                                           \
 }                                                                             \
 
 #define SAVESTATE_OPTION(number)                                              \
@@ -167,10 +915,12 @@ typedef struct _MenuType MenuType;
   2,                                                                          \
   MSG_STATE_MENU_HELP_0,                                                      \
   number,                                                                     \
-  NUMBER_SELECTION_OPTION | ACTION_OPTION                                     \
+  NUMBER_SELECTION_OPTION | ACTION_OPTION,                                    \
+  0,                                                                          \
+  0                                                                           \
 }                                                                             \
 
-#define ACTION_OPTION(action_function, passive_function, display_string, help_string, line_number) \
+#define ACTION_OPTION(action_function, passive_function, display_string, help_string, line_number, display_msg) \
 {                                                                             \
   action_function,                                                            \
   passive_function,                                                           \
@@ -181,10 +931,12 @@ typedef struct _MenuType MenuType;
   0,                                                                          \
   help_string,                                                                \
   line_number,                                                                \
-  ACTION_OPTION                                                               \
+  ACTION_OPTION,                                                              \
+  0,                                                                          \
+  display_msg                                                                 \
 }                                                                             \
 
-#define SUBMENU_OPTION(sub_menu, display_string, help_string, line_number)    \
+#define SUBMENU_OPTION(sub_menu, display_string, help_string, line_number, display_msg)    \
 {                                                                             \
   NULL,                                                                       \
   NULL,                                                                       \
@@ -195,10 +947,12 @@ typedef struct _MenuType MenuType;
   sizeof(sub_menu) / sizeof(MenuOptionType),                                  \
   help_string,                                                                \
   line_number,                                                                \
-  SUBMENU_OPTION                                                              \
+  SUBMENU_OPTION,                                                             \
+  0,                                                                          \
+  display_msg                                                                 \
 }                                                                             \
 
-#define ACTION_SUBMENU_OPTION(sub_menu, action_function, display_string, help_string, line_number) \
+#define ACTION_SUBMENU_OPTION(sub_menu, action_function, display_string, help_string, line_number, display_msg) \
 {                                                                             \
   action_function,                                                            \
   NULL,                                                                       \
@@ -209,10 +963,12 @@ typedef struct _MenuType MenuType;
   sizeof(sub_menu) / sizeof(MenuOptionType),                                  \
   help_string,                                                                \
   line_number,                                                                \
-  SUBMENU_OPTION | ACTION_OPTION                                              \
+  SUBMENU_OPTION | ACTION_OPTION,                                             \
+  0,                                                                          \
+  display_msg                                                                 \
 }                                                                             \
 
-#define SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type) \
+#define SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, display_msg) \
 {                                                                             \
   NULL,                                                                       \
   passive_function,                                                           \
@@ -223,10 +979,12 @@ typedef struct _MenuType MenuType;
   num_options,                                                                \
   help_string,                                                                \
   line_number,                                                                \
-  type                                                                        \
+  type,                                                                       \
+  0,                                                                          \
+  display_msg                                                                 \
 }                                                                             \
 
-#define ACTION_SELECTION_OPTION(action_function, passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type) \
+#define ACTION_SELECTION_OPTION(action_function, passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, display_msg) \
 {                                                                             \
   action_function,                                                            \
   passive_function,                                                           \
@@ -237,25 +995,82 @@ typedef struct _MenuType MenuType;
   num_options,                                                                \
   help_string,                                                                \
   line_number,                                                                \
-  type | ACTION_OPTION                                                        \
+  type | ACTION_OPTION,                                                       \
+  0,                                                                          \
+  display_msg                                                                 \
 }                                                                             \
 
 
-#define STRING_SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number) \
-  SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, STRING_SELECTION_OPTION)
+#define STRING_SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, display_msg) \
+  SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, STRING_SELECTION_OPTION, display_msg)
 
-#define NUMERIC_SELECTION_OPTION(passive_function, display_string, option_ptr, num_options, help_string, line_number) \
-  SELECTION_OPTION(passive_function, display_string, NULL, option_ptr, num_options, help_string, line_number, NUMBER_SELECTION_OPTION)
+#define NUMERIC_SELECTION_OPTION(passive_function, display_string, option_ptr, num_options, help_string, line_number, display_msg) \
+  SELECTION_OPTION(passive_function, display_string, NULL, option_ptr, num_options, help_string, line_number, NUMBER_SELECTION_OPTION, display_msg)
 
-#define STRING_SELECTION_ACTION_OPTION(action_function, passive_function, display_string, options, option_ptr, num_options, help_string, line_number) \
-  ACTION_SELECTION_OPTION(action_function, passive_function, display_string,  options, option_ptr, num_options, help_string, line_number, STRING_SELECTION_OPTION)
+#define STRING_SELECTION_ACTION_OPTION(action_function, passive_function, display_string, options, option_ptr, num_options, help_string, line_number, display_msg) \
+  ACTION_SELECTION_OPTION(action_function, passive_function, display_string,  options, option_ptr, num_options, help_string, line_number, STRING_SELECTION_OPTION, display_msg)
 
-#define NUMERIC_SELECTION_ACTION_OPTION(action_function, passive_function, display_string, option_ptr, num_options, help_string, line_number) \
-  ACTION_SELECTION_OPTION(action_function, passive_function, display_string,  NULL, option_ptr, num_options, help_string, line_number, NUMBER_SELECTION_OPTION)
+#define NUMERIC_SELECTION_ACTION_OPTION(action_function, passive_function, display_string, option_ptr, num_options, help_string, line_number, display_msg) \
+  ACTION_SELECTION_OPTION(action_function, passive_function, display_string,  NULL, option_ptr, num_options, help_string, line_number, NUMBER_SELECTION_OPTION, display_msg)
 
-#define NUMERIC_SELECTION_ACTION_HIDE_OPTION(action_function, passive_function, display_string, option_ptr, num_options, help_string, line_number) \
-  ACTION_SELECTION_OPTION(action_function, passive_function, display_string, NULL, option_ptr, num_options, help_string, line_number, NUMBER_SELECTION_OPTION)
+#define NUMERIC_SELECTION_ACTION_HIDE_OPTION(action_function, passive_function, display_string, option_ptr, num_options, help_string, line_number, display_msg) \
+  ACTION_SELECTION_OPTION(action_function, passive_function, display_string, NULL, option_ptr, num_options, help_string, line_number, NUMBER_SELECTION_OPTION, display_msg)
 
+/* --------------------------------------------------------------------------
+   Tooltip macros (_TT variants).
+   These are identical to the originals but add a `tooltip` MSG index.
+   -------------------------------------------------------------------------- */
+#define ACTION_OPTION_TT(action_function, passive_function, display_string, help_string, line_number, tooltip) \
+{                                                                             \
+  action_function,                                                            \
+  passive_function,                                                           \
+  NULL,                                                                       \
+  display_string,                                                             \
+  NULL,                                                                       \
+  NULL,                                                                       \
+  0,                                                                          \
+  help_string,                                                                \
+  line_number,                                                                \
+  ACTION_OPTION,                                                              \
+  tooltip                                                                 \
+}
+
+#define SUBMENU_OPTION_TT(sub_menu, display_string, help_string, line_number, tooltip)    \
+{                                                                             \
+  NULL,                                                                       \
+  NULL,                                                                       \
+  sub_menu,                                                                   \
+  display_string,                                                             \
+  NULL,                                                                       \
+  NULL,                                                                       \
+  sizeof(sub_menu) / sizeof(MenuOptionType),                                  \
+  help_string,                                                                \
+  line_number,                                                                \
+  SUBMENU_OPTION,                                                             \
+  tooltip                                                                 \
+}
+
+#define SELECTION_OPTION_TT(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, tooltip, display_msg) \
+{                                                                             \
+  NULL,                                                                       \
+  passive_function,                                                           \
+  NULL,                                                                       \
+  display_string,                                                             \
+  options,                                                                    \
+  option_ptr,                                                                 \
+  num_options,                                                                \
+  help_string,                                                                \
+  line_number,                                                                \
+  type,                                                                       \
+  tooltip,                                                                    \
+  display_msg                                                                 \
+}
+
+#define STRING_SELECTION_OPTION_TT(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, tooltip, display_msg) \
+  SELECTION_OPTION_TT(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, STRING_SELECTION_OPTION, tooltip, display_msg)
+
+#define NUMERIC_SELECTION_OPTION_TT(passive_function, display_string, option_ptr, num_options, help_string, line_number, tooltip, display_msg) \
+  SELECTION_OPTION_TT(passive_function, display_string, NULL, option_ptr, num_options, help_string, line_number, NUMBER_SELECTION_OPTION, tooltip, display_msg)
 
 char dir_roms[MAX_PATH];
 char dir_save[MAX_PATH];
@@ -288,10 +1103,9 @@ void _flush_cache(void);
 
 static int sort_function(const void *dest_str_ptr, const void *src_str_ptr);
 
+
 static s32 save_game_config_file(void);
 
-static void update_status_string(char *time_str, char *batt_str, u16 *color_batt);
-static void update_status_string_gbk(char *time_str, char *batt_str, u16 *color_batt);
 static void get_timestamp_string(char *buffer, u16 msg_id, ScePspDateTime *msg_time, int day_of_week);
 
 static void get_savestate_info(char *filename, u16 *snapshot, char *timestamp);
@@ -359,7 +1173,7 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
 
   char time_str[40];
   char batt_str[40];
-  u16 color_batt_life = COLOR_BATT_NORMAL;
+  u16 color_batt_life = color_batt_normal;
   u32 counter = 0;
 
   auto void filelist_term(void);
@@ -401,6 +1215,9 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
   {
     chdir(default_dir_name);
   }
+
+  /* File browser is not the main menu; disable OS exit dialog here */
+  sceImposeSetHomePopup(0);
 
   while (return_value == 1)
   {
@@ -522,11 +1339,11 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
 
     while (repeat)
     {
-      clear_screen(COLOR15_TO_32(COLOR_BG));
+      clear_screen(COLOR15_TO_32(color_bg));
 		if (option_language == 0)
-			print_string(current_dir_short, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);
+			print_string(current_dir_short, 6, 2, color_help_text, BG_NO_FILL);
 		else
-			print_string_gbk(current_dir_short, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);
+			print_string_gbk(current_dir_short, 6, 2, color_help_text, BG_NO_FILL);
       if ((counter % 30) == 0)
 	  {
 	    if (option_language == 0)
@@ -536,26 +1353,23 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
 	  }
       counter++;
 	  if (option_language == 0)
-	  print_string(time_str, TIME_STATUS_POS_X, 2, COLOR_HELP_TEXT, BG_NO_FILL);
+	  print_string(time_str, TIME_STATUS_POS_X, 2, color_help_text, BG_NO_FILL);
 	  else
-	  print_string_gbk(time_str, TIME_STATUS_POS_X, 2, COLOR_HELP_TEXT, BG_NO_FILL);
+	  print_string_gbk(time_str, TIME_STATUS_POS_X, 2, color_help_text, BG_NO_FILL);
  
       if (option_language == 0)
 		print_string(batt_str, BATT_STATUS_POS_X, 2, color_batt_life, BG_NO_FILL);
 	  else
 		print_string_gbk(batt_str, BATT_STATUS_POS_X, 2, color_batt_life, BG_NO_FILL);
 
-		if (option_language == 0)
-			print_string(MSG[MSG_BROWSER_HELP], 30, 258, COLOR_HELP_TEXT, BG_NO_FILL);
-		else
-			print_string_gbk(MSG[MSG_BROWSER_HELP], 30, 258, COLOR_HELP_TEXT, BG_NO_FILL);
+		print_swap_aware(MSG[MSG_BROWSER_HELP], 30, 258, color_help_text, BG_NO_FILL);
 
       char str_buffer_size[32];
       sprintf(str_buffer_size, MSG[MSG_BUFFER], gamepak_ram_buffer_size >> 20);
 		if (option_language == 0)
-			print_string(str_buffer_size, 384, 258, COLOR_HELP_TEXT, BG_NO_FILL);
+			print_string(str_buffer_size, 384, 258, color_help_text, BG_NO_FILL);
 		else
-			print_string_gbk(str_buffer_size, 384, 258, COLOR_HELP_TEXT, BG_NO_FILL);
+			print_string_gbk(str_buffer_size, 384, 258, color_help_text, BG_NO_FILL);
 
       // PSP controller - hold
       if (get_pad_input(PSP_CTRL_HOLD) != 0)
@@ -568,8 +1382,8 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
       // draw scroll bar
       if (num[FILE_LIST] > FILE_LIST_ROWS)
       {
-        draw_box_line(SBAR_X1,  SBAR_Y1,  SBAR_X2,  SBAR_Y2,  COLOR_SCROLL_BAR);
-        draw_box_fill(SBAR_X1I, SBAR_Y1I, SBAR_X2I, SBAR_Y2I, COLOR_SCROLL_BAR);
+        draw_box_line(SBAR_X1,  SBAR_Y1,  SBAR_X2,  SBAR_Y2,  color_scroll_bar);
+        draw_box_fill(SBAR_X1I, SBAR_Y1I, SBAR_X2I, SBAR_Y2I, color_scroll_bar);
       }
 
       for (i = 0; i < FILE_LIST_ROWS; i++)
@@ -579,9 +1393,9 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
         if (current_file_number < num[FILE_LIST])
         {
           if ((current_file_number == selection[FILE_LIST]) && (column == FILE_LIST))
-            current_line_color = COLOR_ACTIVE_ITEM;
+            current_line_color = color_active_item;
           else
-            current_line_color = COLOR_INACTIVE_ITEM;
+            current_line_color = color_inactive_item;
 
           print_string(file_list[current_file_number], FILE_LIST_POS_X, FILE_LIST_POS_Y + (i * FONTHEIGHT), current_line_color, BG_NO_FILL);
         }
@@ -594,21 +1408,21 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
         if (current_dir_number < num[DIR_LIST])
         {
           if ((current_dir_number == selection[DIR_LIST]) && (column == DIR_LIST))
-            current_line_color = COLOR_ACTIVE_ITEM;
+            current_line_color = color_active_item;
           else
-            current_line_color = COLOR_INACTIVE_DIR;
+            current_line_color = color_inactive_dir;
 
-          print_string(dir_list[current_dir_number], DIR_LIST_POS_X, FILE_LIST_POS_Y + (i * FONTHEIGHT), current_line_color, COLOR_BG);
+          print_string(dir_list[current_dir_number], DIR_LIST_POS_X, FILE_LIST_POS_Y + (i * FONTHEIGHT), current_line_color, color_bg);
         }
       }
 
       if (num[DIR_LIST] > FILE_LIST_ROWS)
       {
         if (scroll_value[DIR_LIST] != 0)
-          print_string(FONT_CURSOR_UP_FILL, PSP_SCREEN_WIDTH - (FONTWIDTH * 2), FILE_LIST_POS_Y, COLOR_SCROLL_BAR, COLOR_BG);
+          print_string(FONT_CURSOR_UP_FILL, PSP_SCREEN_WIDTH - (FONTWIDTH * 2), FILE_LIST_POS_Y, color_scroll_bar, color_bg);
 
         if (num[DIR_LIST] > (scroll_value[DIR_LIST] + FILE_LIST_ROWS))
-          print_string(FONT_CURSOR_DOWN_FILL, PSP_SCREEN_WIDTH - (FONTWIDTH * 2), FILE_LIST_POS_Y + ((FILE_LIST_ROWS - 1) * FONTHEIGHT), COLOR_SCROLL_BAR, COLOR_BG);
+          print_string(FONT_CURSOR_DOWN_FILL, PSP_SCREEN_WIDTH - (FONTWIDTH * 2), FILE_LIST_POS_Y + ((FILE_LIST_ROWS - 1) * FONTHEIGHT), color_scroll_bar, color_bg);
       }
 
       __draw_volume_status(1);
@@ -885,9 +1699,73 @@ static void menu_passive_ram_dynarec_policy(void)
 }
 
 
+/* ------------------------------------------------------------------
+   Cheat menu page refresh -- file scope to avoid GCC nested-function
+   trampoline crash when used as a menu passive_function callback.
+   ------------------------------------------------------------------ */
+static char cheat_format_str[MAX_CHEATS][25*4];
+static MenuOptionType *cheats_misc_options_ptr = NULL;
+
+static void reload_cheats_page(void)
+{
+    u32 i;
+    for (i = 0; i < 10; i++)
+    {
+        u32 idx = (10 * menu_cheat_page) + i;
+        cheats_misc_options_ptr[i].display_string = cheat_format_str[idx];
+        cheats_misc_options_ptr[i].current_option = &(cheats[idx].cheat_active);
+    }
+}
+
+
+
+/* ------------------------------------------------------------------
+   Refresh all menu display strings after a language change.
+   Iterates the current menu and patches display_string from display_msg.
+   ------------------------------------------------------------------ */
+static void refresh_menu_strings(MenuType *menu)
+{
+    if (!menu || !menu->options)
+        return;
+
+    u32 i;
+    for (i = 0; i < menu->num_options; i++)
+    {
+        MenuOptionType *opt = &menu->options[i];
+        if (opt->display_msg != 0)
+            opt->display_string = MSG[opt->display_msg];
+    }
+}
+
+/* Global array of all menus — populated once inside menu(),
+   then used by file-scope refresh to avoid nested functions. */
+#define MAX_MENUS 9
+static MenuType *all_menus[MAX_MENUS];
+static u32 num_all_menus = 0;
+
+static void menu_refresh_language(void)
+{
+    u32 i, j;
+    refresh_choice_arrays();
+    for (i = 0; i < num_all_menus; i++)
+    {
+        MenuType *menu = all_menus[i];
+        if (!menu || !menu->options)
+            continue;
+        for (j = 0; j < menu->num_options; j++)
+        {
+            MenuOptionType *opt = &menu->options[j];
+            if (opt->display_msg != 0)
+                opt->display_string = MSG[opt->display_msg];
+        }
+    }
+}
+
+
 u32 menu(void)
 {
 	int id_language;
+  init_choice_arrays();
   u32 i;
 
   u32 repeat = 1;
@@ -909,14 +1787,13 @@ u32 menu(void)
 
   char time_str[40];
   char batt_str[40];
-  u16 color_batt_life = COLOR_BATT_NORMAL;
+  u16 color_batt_life = color_batt_normal;
   u32 counter = 0;
 
   char filename_buffer[MAX_PATH];
 
   char line_buffer[80];
 
-  char cheat_format_str[MAX_CHEATS][25*4];// gpsp kai 41*4
 
   MenuType *current_menu;
   MenuOptionType *current_option;
@@ -927,111 +1804,9 @@ u32 menu(void)
   u32 current_option_num = 0;
   u32 menu_main_option_num = 0;
 
-  const char *yes_no_options[] =
-  {
-    MSG[MSG_NO],
-    MSG[MSG_YES]
-  };
 
-  const char *enable_disable_options[] =
-  {
-    MSG[MSG_DISABLED],
-    MSG[MSG_ENABLED]
-  };
 
-  const char *on_off_options[] =
-  {
-    MSG[MSG_OFF],
-    MSG[MSG_ON]
-  };
 
-  const char *scale_options[] =
-  {
-    MSG[MSG_SCN_SCALED_NONE],
-    MSG[MSG_SCN_SCALED_X15_GU],
-    MSG[MSG_SCN_SCALED_X15_SW],
-    MSG[MSG_SCN_SCALED_USER],
-    MSG[MSG_SCN_SCALED_16X9_GU]
-  };
-
-  const char *frameskip_options[] =
-  {
-    MSG[MSG_AUTO],
-    MSG[MSG_MANUAL],
-    MSG[MSG_OFF]
-  };
-
-  const char *stack_optimize_options[] =
-  {
-    MSG[MSG_OFF],
-    MSG[MSG_AUTO]
-  };
-
-  const char *update_backup_options[] =
-  {
-    MSG[MSG_EXITONLY],
-    MSG[MSG_AUTO]
-  };
-
-  const char *ram_dynarec_options[] =
-  {
-    MSG[MSG_RAM_DYNAREC_FULL_FLUSH],
-    MSG[MSG_RAM_DYNAREC_PARTIAL_NO_REUSE],
-    MSG[MSG_RAM_DYNAREC_PARTIAL_WITH_REUSE]
-  };
-
-  const char *language_option[] =
-  {
-    MSG[MSG_LANG_JAPANESE],
-    MSG[MSG_LANG_ENGLISH],
-    MSG[MSG_LANG_CHS],
-    MSG[MSG_LANG_CHT]
-  };
-
-  const char *sound_volume_options[] =
-  {
-    "0%", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "100%"
-  };
-
-  const char *clock_speed_options[] =
-  {
-    "222MHz", "266MHz", "300MHz", "333MHz"
-  };
-
-  const char *image_format_options[] =
-  {
-    "PNG", "BMP"
-  };
-
-  const char *video_renderer_options[] =
-  {
-    "Old",
-    "New"
-  };
-
-  const char *gamepad_config_buttons[] =
-  {
-    MSG[MSG_PAD_MENU_CFG_0],
-    MSG[MSG_PAD_MENU_CFG_1],
-    MSG[MSG_PAD_MENU_CFG_2],
-    MSG[MSG_PAD_MENU_CFG_3],
-    MSG[MSG_PAD_MENU_CFG_4],
-    MSG[MSG_PAD_MENU_CFG_5],
-    MSG[MSG_PAD_MENU_CFG_6],
-    MSG[MSG_PAD_MENU_CFG_7],
-    MSG[MSG_PAD_MENU_CFG_8],
-    MSG[MSG_PAD_MENU_CFG_9],
-    MSG[MSG_PAD_MENU_CFG_10],
-    MSG[MSG_PAD_MENU_CFG_11],
-    MSG[MSG_PAD_MENU_CFG_12],
-    MSG[MSG_PAD_MENU_CFG_13],
-    MSG[MSG_PAD_MENU_CFG_14],
-    MSG[MSG_PAD_MENU_CFG_15],
-    MSG[MSG_PAD_MENU_CFG_16],
-    MSG[MSG_PAD_MENU_CFG_17],
-    MSG[MSG_PAD_MENU_CFG_18],
-    MSG[MSG_PAD_MENU_CFG_19]
-  };
 
   auto void choose_menu(MenuType *new_menu);
 
@@ -1061,7 +1836,10 @@ u32 menu(void)
   auto void submenu_analog(void);
   auto void submenu_savestate(void);
   auto void submenu_main(void);
-  auto void reload_cheats_page(void);
+  auto void submenu_theme(void);
+  auto void submenu_custom_colors(void);
+  auto void menu_passive_theme(void);
+  auto void menu_theme_default(void);
 
   auto void draw_analog_pad_range(void);
   auto void load_savestate_timestamps(void);
@@ -1262,7 +2040,7 @@ u32 menu(void)
 	option_analog_sensitivity = 4;
 	option_hblank_irq_window_start = 1;
 	option_hblank_irq_window_end = 160;
-	option_psp_vsync = 0;
+  option_psp_vsync = 0;
 	//int id_language;
 	sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);
 	if (id_language == PSP_SYSTEMPARAM_LANGUAGE_JAPANESE)
@@ -1271,11 +2049,73 @@ u32 menu(void)
 		option_language = 2;
 	else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_TRADITIONAL)
 		option_language = 3;
+  else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_ITALIAN)
+		option_language = 4;
 	else
-		option_language = 1;
+		option_language = 1; // english
 
     flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
     ram_dynarec_policy_menu_prev = ~(u32)0;
+  }
+
+  void menu_graphics_default(void)
+  {
+    option_screen_scale = SCALED_X15_GU;
+    option_screen_mag = 170;
+    option_screen_filter = FILTER_BILINEAR;
+    option_video_renderer = VIDEO_RENDERER_NEW;
+    option_oam_hijacking_enabled = 0;
+    option_psp_vsync = 0;
+  }
+
+  void menu_emulator_default(void)
+  {
+    option_frameskip_type = FRAMESKIP_AUTO;
+    option_frameskip_value = 9;
+    option_clock_speed = PSP_CLOCK_333;
+    option_stack_optimize = 1;
+    option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+    option_hblank_irq_window_start = 1;
+    option_hblank_irq_window_end = 160;
+    option_boot_mode = 0;
+    ram_dynarec_policy_menu_prev = ~(u32)0;
+  }
+
+  void menu_gamepad_default(void)
+  {
+    // Physical PSP buttons mapped to GBA buttons.
+    gamepad_config_map[8]  = BUTTON_ID_UP;          /* PSP D-pad Up    → GBA Up */
+    gamepad_config_map[6]  = BUTTON_ID_DOWN;        /* PSP D-pad Down  → GBA Down */
+    gamepad_config_map[7]  = BUTTON_ID_LEFT;        /* PSP D-pad Left  → GBA Left */
+    gamepad_config_map[9]  = BUTTON_ID_RIGHT;       /* PSP D-pad Right → GBA Right */
+    gamepad_config_map[1]  = BUTTON_ID_A;           /* PSP Circle      → GBA A */
+    gamepad_config_map[2]  = BUTTON_ID_B;           /* PSP Cross       → GBA B */
+    gamepad_config_map[3]  = BUTTON_ID_FPS;         /* PSP Square      → EMU FPS */
+    gamepad_config_map[0]  = BUTTON_ID_FASTFORWARD; /* PSP Triangle    → EMU FF */
+    gamepad_config_map[4]  = BUTTON_ID_L;           /* PSP L trigger   → GBA L */
+    gamepad_config_map[5]  = BUTTON_ID_R;           /* PSP R trigger   → GBA R */
+    gamepad_config_map[11] = BUTTON_ID_START;       /* PSP Start       → GBA Start */
+    gamepad_config_map[10] = BUTTON_ID_SELECT;      /* PSP Select      → GBA Select */ 
+  }
+
+  void menu_analog_default(void)
+  {
+    option_enable_analog = 0;
+    option_analog_sensitivity = 4;
+    /* Analog stick → GBA directions (only active when analog enabled) */
+    gamepad_config_map[12] = BUTTON_ID_UP;       /* Analog Up */
+    gamepad_config_map[13] = BUTTON_ID_DOWN;     /* Analog Down */
+    gamepad_config_map[14] = BUTTON_ID_LEFT;     /* Analog Left */
+    gamepad_config_map[15] = BUTTON_ID_RIGHT;     /* Analog Right */
+  }
+  
+  void menu_theme_settings_default(void)
+  {
+    psp_fps_debug = 0;
+    option_screen_capture_format = 0;
+    option_sound_volume = 10;
+    option_update_backup = 1;
+    // flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
   }
 
   void menu_load_cheat_file(void)
@@ -1317,36 +2157,36 @@ u32 menu(void)
 
   #define DRAW_TITLE(title)                                                   \
    sprintf(line_buffer, "%s %s", FONT_GBA_ICON, MSG[title]);                  \
-   print_string(line_buffer, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);              \
+   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
 
   #define DRAW_TITLE_PSP(title)                                                   \
    sprintf(line_buffer, "%s %s", FONT_PSP_ICON, MSG[title]);                  \
-   print_string(line_buffer, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);              \
+   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
 
   #define DRAW_TITLE_SAVESTATE(title)                                                   \
    sprintf(line_buffer, "%s %s", FONT_MSC_ICON, MSG[title]);                  \
-   print_string(line_buffer, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);              \
+   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
 
 
   #define DRAW_TITLE_GBK(title)                                                   \
    sprintf(line_buffer, "%s %s", FONT_GBA_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);              \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
 
   #define DRAW_TITLE_PSP_GBK(title)                                                   \
    sprintf(line_buffer, "%s %s", FONT_PSP_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);              \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
 
   #define DRAW_TITLE_SAVESTATE_GBK(title)                                                   \
    sprintf(line_buffer, "%s %s", FONT_MSC_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);              \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
 
   #define DRAW_TITLE_OPT_GBK(title)                                                   \
    sprintf(line_buffer, "%s %s", FONT_OPT_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);              \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
 
   #define DRAW_TITLE_PAD_GBK(title)                                                   \
    sprintf(line_buffer, "%s %s", FONT_PAD_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, COLOR_HELP_TEXT, BG_NO_FILL);              \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
 
   void submenu_emulator(void)
   {
@@ -1400,9 +2240,9 @@ u32 menu(void)
         menu_change_state();
       }
 	if (option_language == 0)
-      print_string(MSG[savestate_action ? MSG_SAVE : MSG_LOAD], MENU_LIST_POS_X + ((strlen(savestate_timestamps[0]) + 1) * FONTWIDTH), (current_option_num * FONTHEIGHT) + 28, COLOR_ACTIVE_ITEM, BG_NO_FILL);
+      print_string(MSG[savestate_action ? MSG_SAVE : MSG_LOAD], MENU_LIST_POS_X + ((strlen(savestate_timestamps[0]) + 1) * FONTWIDTH), (current_option_num * FONTHEIGHT) + 28, color_active_item, BG_NO_FILL);
 	else
-      print_string_gbk(MSG[savestate_action ? MSG_SAVE : MSG_LOAD], MENU_LIST_POS_X + ((strlen(savestate_timestamps[0]) + 1) * FONTWIDTH), (current_option_num * FONTHEIGHT) + 28, COLOR_ACTIVE_ITEM, BG_NO_FILL);
+      print_string_gbk(MSG[savestate_action ? MSG_SAVE : MSG_LOAD], MENU_LIST_POS_X + ((strlen(savestate_timestamps[0]) + 1) * FONTWIDTH), (current_option_num * FONTHEIGHT) + 28, color_active_item, BG_NO_FILL);
     }
   }
 
@@ -1610,56 +2450,126 @@ u32 menu(void)
 
 
   // Marker for help information, don't go past this mark (except \n)------*
+
+  /* ------------------------------------------------------------------
+     Theme submenu
+   ------------------------------------------------------------------ */
+
+
+  void submenu_theme(void)
+  {
+    DRAW_TITLE_OPT_GBK(MSG_EMULATOR_MENU_TITLE);
+  }
+
+  void submenu_custom_colors(void)
+  {
+    DRAW_TITLE_OPT_GBK(MSG_OPTION_MENU_CUSTOM_COLORS);
+  }
+
+  void menu_passive_theme(void)
+  {
+    apply_theme(option_theme);
+  }
+
+  void menu_theme_default(void)
+  {
+    option_theme = 0;
+    apply_theme(option_theme);
+  }
+
+
+
+
+
+  MenuOptionType custom_colors_options[] =
+  {
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_BG],            MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 0, MSG_CUSTOM_COLOR_BG),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_ROM_INFO],      MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 1, MSG_CUSTOM_COLOR_ROM_INFO),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_ACTIVE_ITEM],   MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 2, MSG_CUSTOM_COLOR_ACTIVE_ITEM),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_INACTIVE_ITEM], MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 3, MSG_CUSTOM_COLOR_INACTIVE_ITEM),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_TOOLTIP_TEXT],  MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 4, MSG_CUSTOM_COLOR_TOOLTIP_TEXT),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_HELP_TEXT],     MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 5, MSG_CUSTOM_COLOR_HELP_TEXT),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_INACTIVE_DIR],  MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 6, MSG_CUSTOM_COLOR_INACTIVE_DIR),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_SCROLL_BAR],    MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 7, MSG_CUSTOM_COLOR_SCROLL_BAR),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_BATT_NORMAL],   MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 8, MSG_CUSTOM_COLOR_BATT_NORMAL),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_BATT_LOW],      MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 9, MSG_CUSTOM_COLOR_BATT_LOW),
+    ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_BATT_CHARG],    MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 10, MSG_CUSTOM_COLOR_BATT_CHARG),
+
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 12, MSG_OPTION_MENU_11)
+  };
+
+  MAKE_MENU(custom_colors, NULL, NULL);
+
+
+  MenuOptionType theme_options[] =
+  {
+    STRING_SELECTION_OPTION(menu_passive_theme, MSG[MSG_OPTION_MENU_THEMES], theme_preset_options, &option_theme, 9, MSG_OPTION_MENU_HELP_THEMES, 0, MSG_OPTION_MENU_THEMES),
+
+    SUBMENU_OPTION(&custom_colors_menu, MSG[MSG_OPTION_MENU_CUSTOM_COLORS], MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 1, MSG_OPTION_MENU_CUSTOM_COLORS),
+
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_SWAP_BUTTONS], swap_button_options, &option_swap_confirm_buttons, 2, MSG_OPTION_MENU_HELP_SWAP_BUTTONS, 3, MSG_OPTION_MENU_SWAP_BUTTONS),
+
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_6], sound_volume_options, &option_sound_volume, 11, MSG_OPTION_MENU_HELP_6, 4, MSG_OPTION_MENU_6),
+
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_SHOW_FPS], on_off_options, &psp_fps_debug, 2, MSG_OPTION_MENU_HELP_SHOW_FPS, 5, MSG_OPTION_MENU_SHOW_FPS),
+
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_SCREENSHOT], image_format_options, &option_screen_capture_format, 2, MSG_OPTION_MENU_HELP_7, 6, MSG_OPTION_MENU_SCREENSHOT),
+    
+    STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 7, MSG_TOOLTIP_AUTO_BACKUP, MSG_OPTION_MENU_9), 
+    
+    STRING_SELECTION_ACTION_OPTION(NULL, menu_refresh_language, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 5, MSG_OPTION_MENU_HELP_10, 9, MSG_OPTION_MENU_10), 
+
+    ACTION_OPTION(menu_theme_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT_THEME], MSG_OPTION_MENU_HELP_DEFAULT_THEME, 11, MSG_OPTION_MENU_DEFAULT_THEME),
+
+    ACTION_OPTION(menu_theme_settings_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT_SETTINGS], MSG_OPTION_MENU_HELP_DEFAULT, 12, MSG_OPTION_MENU_DEFAULT_SETTINGS),
+
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 14, MSG_OPTION_MENU_11)
+  };
+
+  MAKE_MENU(theme, NULL, NULL);
+
   MenuOptionType graphics_options[] =
   {
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_0], scale_options, &option_screen_scale, 5, MSG_OPTION_MENU_HELP_0, 0),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_0], scale_options, &option_screen_scale, 5, MSG_OPTION_MENU_HELP_0, 0, MSG_OPTION_MENU_0),
 
-    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_1], &option_screen_mag, 201, MSG_OPTION_MENU_HELP_1, 1),
+    NUMERIC_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_1], &option_screen_mag, 201, MSG_OPTION_MENU_HELP_1, 1,MSG_TOOLTIP_MAGNIFICATION, MSG_OPTION_MENU_1),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_2], on_off_options, &option_screen_filter, 2, MSG_OPTION_MENU_HELP_2, 2),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_2], on_off_options, &option_screen_filter, 2, MSG_OPTION_MENU_HELP_2, 2, MSG_OPTION_MENU_2),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_SHOW_FPS], on_off_options, &psp_fps_debug, 2, MSG_OPTION_MENU_HELP_SHOW_FPS, 3),
+    STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_VIDEORENDER], video_renderer_options, &option_video_renderer, 2, MSG_OPTION_MENU_HELP_7, 4, MSG_TOOLTIP_VIDEO_RENDERER, MSG_OPTION_MENU_VIDEORENDER),
 
-    STRING_SELECTION_OPTION(NULL, "Screen capture : %s", image_format_options, &option_screen_capture_format, 2, MSG_MAIN_MENU_HELP_3, 4),
+    STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_OAMHIJACKSUPPORT], on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 5, MSG_TOOLTIP_OAM_HIJACKING, MSG_OPTION_MENU_OAMHIJACKSUPPORT),
 
-    STRING_SELECTION_OPTION(NULL, "Video renderer   : %s", video_renderer_options, &option_video_renderer, 2, MSG_OPTION_MENU_HELP_7, 6),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_VSYNCPSP], on_off_options, &option_psp_vsync, 2, MSG_OPTION_MENU_HELP_7, 6,MSG_OPTION_MENU_VSYNCPSP),
+    
+    ACTION_OPTION(menu_graphics_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 8, MSG_OPTION_MENU_DEFAULT),
 
-    STRING_SELECTION_OPTION(NULL, "OAM hijack support: %s", on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 7),
-
-    STRING_SELECTION_OPTION(NULL, "VSync (PSP)       : %s", on_off_options, &option_psp_vsync, 2, MSG_OPTION_MENU_HELP_7, 8),
-
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 10)
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 10, MSG_OPTION_MENU_11)
   };
 
   MAKE_MENU(graphics, NULL, NULL);
 
   MenuOptionType emulator_options[] =
   {
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_3], frameskip_options, &option_frameskip_type, 3, MSG_OPTION_MENU_HELP_3, 5),
+    STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_3], frameskip_options, &option_frameskip_type, 3, MSG_OPTION_MENU_HELP_3, 0, MSG_TOOLTIP_FRAMESKIP_TYPE, MSG_OPTION_MENU_3),
 
-    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_4], &option_frameskip_value, 10, MSG_OPTION_MENU_HELP_4, 6),
+    NUMERIC_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_4], &option_frameskip_value, 10, MSG_OPTION_MENU_HELP_4, 1, MSG_TOOLTIP_FRAMESKIP_VALUE, MSG_OPTION_MENU_4),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_5], clock_speed_options, &option_clock_speed, 4, MSG_OPTION_MENU_HELP_5, 7), 
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_5], clock_speed_options, &option_clock_speed, 4, MSG_OPTION_MENU_HELP_5, 2, MSG_OPTION_MENU_5), 
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_6], sound_volume_options, &option_sound_volume, 11, MSG_OPTION_MENU_HELP_6, 8),
+    STRING_SELECTION_OPTION_TT(menu_passive_ram_dynarec_policy, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], ram_dynarec_options, &option_ram_dynarec_policy, 3, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 4, MSG_TOOLTIP_RAM_DYNAREC_MODE, MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE),
 
-    STRING_SELECTION_OPTION(menu_passive_ram_dynarec_policy, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], ram_dynarec_options, &option_ram_dynarec_policy, 3, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 9),
+    NUMERIC_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_WIN_START], &option_hblank_irq_window_start, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START, 5, MSG_TOOLTIP_HBLANK_WIN_START, MSG_OPTION_MENU_HBLANK_IRQ_WIN_START),
 
-    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_WIN_START], &option_hblank_irq_window_start, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START, 10),
+    NUMERIC_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_WIN_END], &option_hblank_irq_window_end, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END, 6, MSG_TOOLTIP_HBLANK_WIN_END, MSG_OPTION_MENU_HBLANK_IRQ_WIN_END),
 
-    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_WIN_END], &option_hblank_irq_window_end, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END, 11),
+    STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 8, MSG_TOOLTIP_STACK_OPTIMIZE, MSG_OPTION_MENU_7),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 12),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 10, MSG_OPTION_MENU_8),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_8], yes_no_options, &option_boot_mode, 2, MSG_OPTION_MENU_HELP_8, 13),
+    ACTION_OPTION(menu_emulator_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 12, MSG_OPTION_MENU_DEFAULT),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 14), 
-
-    STRING_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 4, MSG_OPTION_MENU_HELP_10, 15), 
-
-    ACTION_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 16),
-
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 17)
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 14, MSG_OPTION_MENU_11)
   };
 
   MAKE_MENU(emulator, NULL, NULL);
@@ -1678,11 +2588,13 @@ u32 menu(void)
     CHEAT_OPTION((10 * menu_cheat_page) + 8),
     CHEAT_OPTION((10 * menu_cheat_page) + 9),
 
-    NUMERIC_SELECTION_OPTION(reload_cheats_page, MSG[MSG_CHEAT_MENU_3], &menu_cheat_page, MAX_CHEATS_PAGE, MSG_CHEAT_MENU_HELP_3, 11),
-    ACTION_OPTION(NULL, NULL, MSG[MSG_CHEAT_MENU_1], MSG_CHEAT_MENU_HELP_1, 13),
+    NUMERIC_SELECTION_OPTION(reload_cheats_page, MSG[MSG_CHEAT_MENU_3], &menu_cheat_page, MAX_CHEATS_PAGE, MSG_CHEAT_MENU_HELP_3, 11, MSG_CHEAT_MENU_3),
+    ACTION_OPTION(NULL, NULL, MSG[MSG_CHEAT_MENU_1], MSG_CHEAT_MENU_HELP_1, 13, MSG_CHEAT_MENU_1),
 
-    SUBMENU_OPTION(NULL, MSG[MSG_CHEAT_MENU_2], MSG_CHEAT_MENU_HELP_2, 15)
+    SUBMENU_OPTION(NULL, MSG[MSG_CHEAT_MENU_2], MSG_CHEAT_MENU_HELP_2, 15, MSG_CHEAT_MENU_2)
   };
+
+  cheats_misc_options_ptr = cheats_misc_options;
 
   MAKE_MENU(cheats_misc, NULL, NULL);
 
@@ -1699,81 +2611,100 @@ u32 menu(void)
     SAVESTATE_OPTION(8),
     SAVESTATE_OPTION(9),
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_STATE_MENU_1], MSG_STATE_MENU_HELP_1, 11),
+    ACTION_OPTION(NULL, NULL, MSG[MSG_STATE_MENU_1], MSG_STATE_MENU_HELP_1, 11, MSG_STATE_MENU_1),
 
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_STATE_MENU_2], MSG_STATE_MENU_HELP_2, 13)
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_STATE_MENU_2], MSG_STATE_MENU_HELP_2, 13, MSG_STATE_MENU_2)
   };
 
   MAKE_MENU(savestate, NULL, NULL);
 
   MenuOptionType gamepad_config_options[] =
   {
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_0], 0),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_1], 1),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_2], 2),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_3], 3),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_4], 4),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_5], 5),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_6], 6),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_7], 7),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_8], 8),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_9], 9),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_10], 10),
-    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_11], 11),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_0], 0, MSG_PAD_MENU_0),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_1], 1, MSG_PAD_MENU_1),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_2], 2, MSG_PAD_MENU_2),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_3], 3, MSG_PAD_MENU_3),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_4], 4, MSG_PAD_MENU_4),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_5], 5, MSG_PAD_MENU_5),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_6], 6, MSG_PAD_MENU_6),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_7], 7, MSG_PAD_MENU_7),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_8], 8, MSG_PAD_MENU_8),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_9], 9, MSG_PAD_MENU_9),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_10], 10, MSG_PAD_MENU_10),
+    GAMEPAD_CONFIG_OPTION(MSG[MSG_PAD_MENU_11], 11, MSG_PAD_MENU_11),
 
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_PAD_MENU_12], MSG_PAD_MENU_HELP_1, 13)
+    ACTION_OPTION(menu_gamepad_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT_KEYBIND, 13, MSG_OPTION_MENU_DEFAULT),
+
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_PAD_MENU_12], MSG_PAD_MENU_HELP_1, 15, MSG_PAD_MENU_12)
   };
 
   MAKE_MENU(gamepad_config, NULL, NULL);
 
   MenuOptionType analog_config_options[] =
   {
-    ANALOG_CONFIG_OPTION(MSG[MSG_A_PAD_MENU_0], 0),
-    ANALOG_CONFIG_OPTION(MSG[MSG_A_PAD_MENU_1], 1),
-    ANALOG_CONFIG_OPTION(MSG[MSG_A_PAD_MENU_2], 2),
-    ANALOG_CONFIG_OPTION(MSG[MSG_A_PAD_MENU_3], 3),
+    ANALOG_CONFIG_OPTION(MSG[MSG_A_PAD_MENU_0], 0, MSG_A_PAD_MENU_0),
+    ANALOG_CONFIG_OPTION(MSG[MSG_A_PAD_MENU_1], 1, MSG_A_PAD_MENU_1),
+    ANALOG_CONFIG_OPTION(MSG[MSG_A_PAD_MENU_2], 2, MSG_A_PAD_MENU_2),
+    ANALOG_CONFIG_OPTION(MSG[MSG_A_PAD_MENU_3], 3, MSG_A_PAD_MENU_3),
 
-    STRING_SELECTION_OPTION(NULL, MSG[MSG_A_PAD_MENU_4], yes_no_options, &option_enable_analog, 2, MSG_A_PAD_MENU_HELP_0, 5),
-    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_A_PAD_MENU_5], &option_analog_sensitivity, 10, MSG_A_PAD_MENU_HELP_1, 6),
+    STRING_SELECTION_OPTION(NULL, MSG[MSG_A_PAD_MENU_4], yes_no_options, &option_enable_analog, 2, MSG_A_PAD_MENU_HELP_0, 5, MSG_A_PAD_MENU_4),
+    NUMERIC_SELECTION_OPTION(NULL, MSG[MSG_A_PAD_MENU_5], &option_analog_sensitivity, 10, MSG_A_PAD_MENU_HELP_1, 6, MSG_A_PAD_MENU_5),
+    
+    ACTION_OPTION(menu_analog_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULTKEYBIND, 8, MSG_OPTION_MENU_DEFAULT),
 
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_A_PAD_MENU_6], MSG_A_PAD_MENU_HELP_2, 8)
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_A_PAD_MENU_6], MSG_A_PAD_MENU_HELP_2, 10, MSG_A_PAD_MENU_6)
   };
 
   MAKE_MENU(analog_config, NULL, NULL);
 
   MenuOptionType main_options[] =
   {
-    NUMERIC_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_0], &savestate_slot, 10, MSG_MAIN_MENU_HELP_0, 0),
+    NUMERIC_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_0], &savestate_slot, 10, MSG_MAIN_MENU_HELP_0, 0, MSG_MAIN_MENU_0),
 
-    NUMERIC_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_1], &savestate_slot, 10, MSG_MAIN_MENU_HELP_1, 1),
+    NUMERIC_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_1], &savestate_slot, 10, MSG_MAIN_MENU_HELP_1, 1, MSG_MAIN_MENU_1),
 
-    ACTION_SUBMENU_OPTION(&savestate_menu, NULL, MSG[MSG_MAIN_MENU_2], MSG_MAIN_MENU_HELP_2, 2),
+    ACTION_SUBMENU_OPTION(&savestate_menu, NULL, MSG[MSG_MAIN_MENU_2], MSG_MAIN_MENU_HELP_2, 2, MSG_MAIN_MENU_2),
 
-    SUBMENU_OPTION(&graphics_menu, MSG[MSG_MAIN_MENU_3], MSG_MAIN_MENU_HELP_3, 4),
+    SUBMENU_OPTION(&graphics_menu, MSG[MSG_MAIN_MENU_3], MSG_MAIN_MENU_HELP_3, 4, MSG_MAIN_MENU_3),
 
-    SUBMENU_OPTION(&emulator_menu, MSG[MSG_MAIN_MENU_4], MSG_MAIN_MENU_HELP_4, 6), 
+    SUBMENU_OPTION(&emulator_menu, MSG[MSG_MAIN_MENU_4], MSG_MAIN_MENU_HELP_4, 5, MSG_MAIN_MENU_4), 
 
-    SUBMENU_OPTION(&gamepad_config_menu, MSG[MSG_MAIN_MENU_5], MSG_MAIN_MENU_HELP_5, 7),
+    SUBMENU_OPTION(&gamepad_config_menu, MSG[MSG_MAIN_MENU_5], MSG_MAIN_MENU_HELP_5, 6, MSG_MAIN_MENU_5),
 
-    SUBMENU_OPTION(&analog_config_menu, MSG[MSG_MAIN_MENU_6], MSG_MAIN_MENU_HELP_6, 8),
+    SUBMENU_OPTION(&analog_config_menu, MSG[MSG_MAIN_MENU_6], MSG_MAIN_MENU_HELP_6, 7, MSG_MAIN_MENU_6),
+    
+    SUBMENU_OPTION(&theme_menu, MSG[MSG_MAIN_MENU_EMULATOR], MSG_MAIN_MENU_HELP_EMULATOR, 8, MSG_MAIN_MENU_EMULATOR),
 
-    ACTION_OPTION(menu_show_game_txt_debug, NULL, "game_config.txt (SMC / idle)", MSG_BLANK, 9),
+    ACTION_OPTION(menu_show_game_txt_debug, NULL, MSG[MSG_MAIN_MENU_GAMECONFIG], MSG_MAIN_MENU_HELP_GAMECONFIG, 9, MSG_MAIN_MENU_GAMECONFIG),
 
-    SUBMENU_OPTION(&cheats_misc_menu, MSG[MSG_MAIN_MENU_CHEAT], MSG_MAIN_MENU_HELP_CHEAT, 10),
+    SUBMENU_OPTION(&cheats_misc_menu, MSG[MSG_MAIN_MENU_CHEAT], MSG_MAIN_MENU_HELP_CHEAT, 10, MSG_MAIN_MENU_CHEAT),
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_7], MSG_MAIN_MENU_HELP_7, 11),
+    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_7], MSG_MAIN_MENU_HELP_7, 12, MSG_MAIN_MENU_7),
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_8], MSG_MAIN_MENU_HELP_8, 13),
+    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_8], MSG_MAIN_MENU_HELP_8, 13, MSG_MAIN_MENU_8),
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_9], MSG_MAIN_MENU_HELP_9, 14),
+    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_9], MSG_MAIN_MENU_HELP_9, 14, MSG_MAIN_MENU_9),
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_10], MSG_MAIN_MENU_HELP_10, 16),
+    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_10], MSG_MAIN_MENU_HELP_10, 17, MSG_MAIN_MENU_10),
 
-    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_11], MSG_MAIN_MENU_HELP_11, 17)
+    ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_11], MSG_MAIN_MENU_HELP_11, 18, MSG_MAIN_MENU_11)
   };
 
 
   MAKE_MENU(main, NULL, NULL);
+  /* Populate global menu array for language refresh */
+  all_menus[0] = &main_menu;
+  all_menus[1] = &graphics_menu;
+  all_menus[2] = &emulator_menu;
+  all_menus[3] = &gamepad_config_menu;
+  all_menus[4] = &analog_config_menu;
+  all_menus[5] = &theme_menu;
+  all_menus[6] = &custom_colors_menu;
+  all_menus[7] = &savestate_menu;
+  all_menus[8] = &cheats_misc_menu;
+  num_all_menus = MAX_MENUS;
+
+
 
   void choose_menu(MenuType *new_menu)
   {
@@ -1783,22 +2714,15 @@ u32 menu(void)
     current_menu = new_menu;
     current_option = new_menu->options;
     current_option_num = 0;
-  }
 
-  void reload_cheats_page()
-  {
-    for(i = 0; i<10; i++)
-    {
-      cheats_misc_options[i].display_string = cheat_format_str[(10 * menu_cheat_page) + i];
-      cheats_misc_options[i].current_option = &(cheats[(10 * menu_cheat_page) + i].cheat_active);
-    }
+    /* Enable PSP OS exit dialog only in the main menu.
+       In submenus and in-game, HOME is handled by the emulator. */
+    //sceImposeSetHomePopup((current_menu == &main_menu) ? 1 : 0);
+    sceImposeSetHomePopup(1); // enable in all menus but not game
   }
-
 
   sound_pause = 1;
 
-  video_resolution_large();
-  set_cpu_clock(PSP_CLOCK_222);
 
   current_screen = copy_screen();
   savestate_screen = (u16 *)safe_malloc(GBA_SCREEN_SIZE);
@@ -1833,11 +2757,13 @@ u32 menu(void)
   //menu_cheat_page = 0;
   reload_cheats_page();
 
+  video_resolution_large();
+  set_cpu_clock(PSP_CLOCK_222);
   choose_menu(&main_menu);
 
   while (repeat)
   {
-    clear_screen(COLOR15_TO_32(COLOR_BG));
+    clear_screen(COLOR15_TO_32(color_bg));
 
     if ((counter % 30) == 0)
 	{
@@ -1848,19 +2774,36 @@ u32 menu(void)
 	}
     counter++;
 	if (option_language == 0)
-    print_string(time_str, TIME_STATUS_POS_X, 2, COLOR_HELP_TEXT, BG_NO_FILL);
+    print_string(time_str, TIME_STATUS_POS_X, 2, color_help_text, BG_NO_FILL);
 	else
-    print_string_gbk(time_str, TIME_STATUS_POS_X, 2, COLOR_HELP_TEXT, BG_NO_FILL);
+    print_string_gbk(time_str, TIME_STATUS_POS_X, 2, color_help_text, BG_NO_FILL);
 
 	if (option_language == 0)
     print_string(batt_str, BATT_STATUS_POS_X, 2, color_batt_life, BG_NO_FILL);
 	else
 	print_string_gbk(batt_str, BATT_STATUS_POS_X, 2, color_batt_life, BG_NO_FILL);
 
-    print_string(game_title, 228, 28, COLOR_INACTIVE_ITEM, BG_NO_FILL);
-    blit_to_screen(screen_image_ptr, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, SCREEN_IMAGE_POS_X, SCREEN_IMAGE_POS_Y);
+    print_string(game_title, 228, 28, color_inactive_item, BG_NO_FILL);
 
-    //print_string(backup_id, 228, 208, COLOR_INACTIVE_ITEM, BG_NO_FILL);
+    /* In Theme or Custom Colors menus, show live theme preview instead of game screenshot */
+    if (current_menu == &custom_colors_menu || current_menu == &theme_menu)
+    {
+        draw_theme_preview(0xFFFF);  /* 0xFFFF = no specific color being edited */
+        draw_box_line(SCREEN_IMAGE_POS_X - 1, SCREEN_IMAGE_POS_Y - 1,
+                      SCREEN_IMAGE_POS_X + GBA_SCREEN_WIDTH, SCREEN_IMAGE_POS_Y + GBA_SCREEN_HEIGHT,
+                      color_inactive_item);
+    }
+    else
+    {
+        blit_to_screen(screen_image_ptr, GBA_SCREEN_WIDTH, GBA_SCREEN_HEIGHT, SCREEN_IMAGE_POS_X, SCREEN_IMAGE_POS_Y);
+        // --- Border around game screenshot ---
+        draw_box_line(SCREEN_IMAGE_POS_X - 1, SCREEN_IMAGE_POS_Y - 1,
+                      SCREEN_IMAGE_POS_X + GBA_SCREEN_WIDTH, SCREEN_IMAGE_POS_Y + GBA_SCREEN_HEIGHT,
+                      color_inactive_item);
+        // --- End border ---
+    }
+
+    //print_string(backup_id, 228, 208, color_inactive_item, BG_NO_FILL);
 
     if (current_menu && current_menu->init_function != NULL)
     {
@@ -1869,6 +2812,22 @@ u32 menu(void)
 
     if (current_menu == &savestate_menu)
       submenu_savestate();
+    if (current_menu == &graphics_menu)
+      submenu_graphics();
+    if (current_menu == &theme_menu)
+      submenu_theme();
+    if (current_menu == &custom_colors_menu)
+      submenu_custom_colors();
+    if (current_menu == &emulator_menu)
+      submenu_emulator();
+    if (current_menu == &gamepad_config_menu)
+      submenu_gamepad();
+    if (current_menu == &analog_config_menu)
+      submenu_analog();
+    if (current_menu == &cheats_misc_menu)
+      submenu_cheats_misc();
+    if (current_menu == &main_menu)
+      submenu_main();
 
     if (current_menu && current_menu->options)
     {
@@ -1889,16 +2848,40 @@ u32 menu(void)
       }
 /*file charset*/
 		if (option_language == 0)
-			print_string(line_buffer, MENU_LIST_POS_X, (display_option->line_number * FONTHEIGHT) + 28, (display_option == current_option) ? COLOR_ACTIVE_ITEM : COLOR_INACTIVE_ITEM, BG_NO_FILL);
+			print_string(line_buffer, MENU_LIST_POS_X, (display_option->line_number * FONTHEIGHT) + 28, (display_option == current_option) ? color_active_item : color_inactive_item, BG_NO_FILL);
 		else
-			print_string_gbk(line_buffer, MENU_LIST_POS_X, (display_option->line_number * FONTHEIGHT) + 28, (display_option == current_option) ? COLOR_ACTIVE_ITEM : COLOR_INACTIVE_ITEM, BG_NO_FILL);
+			print_string_gbk(line_buffer, MENU_LIST_POS_X, (display_option->line_number * FONTHEIGHT) + 28, (display_option == current_option) ? color_active_item : color_inactive_item, BG_NO_FILL);
       }
     }
 
-	if (option_language == 0)
-		print_string(MSG[current_option->help_string], 30, 258, COLOR_HELP_TEXT, BG_NO_FILL);
+  // --- Tooltip (drawn above bottom button hints) ---
+  if (current_option->tooltip_string != 0)
+  {
+    if (option_language == 0)
+      print_string(MSG[current_option->tooltip_string], MENU_LIST_POS_X, TEXT_TOOLTIP_POS_Y, color_tooltip_text, BG_NO_FILL);
+    else
+      print_string_gbk(MSG[current_option->tooltip_string], MENU_LIST_POS_X, TEXT_TOOLTIP_POS_Y, color_tooltip_text, BG_NO_FILL);
+  }
+  // --- End tooltip ---
+
+  // Bottom help text — merge back-to-game hint when ROM is running
+  {
+    char bottom_buf[160];
+    const char *help_txt = MSG[current_option->help_string];
+    const char *back_txt = MSG[MSG_MAIN_MENU_HELP_RETURNTOGAME];
+
+    if (current_menu == &main_menu && first_load == 0)
+      snprintf(bottom_buf, sizeof(bottom_buf), "%s   %s", help_txt, back_txt);
+    else
+      snprintf(bottom_buf, sizeof(bottom_buf), "%s", help_txt);
+
+    print_swap_aware(bottom_buf, 30, 258, color_help_text, BG_NO_FILL);
+  }
+
+/* 	if (option_language == 0)
+		print_string(MSG[current_option->help_string], 30, 258, color_help_text, BG_NO_FILL);
 	else
-		print_string_gbk(MSG[current_option->help_string], 30, 258, COLOR_HELP_TEXT, BG_NO_FILL);
+		print_string_gbk(MSG[current_option->help_string], 30, 258, color_help_text, BG_NO_FILL); */
 
     // PSP controller - hold
     if (get_pad_input(PSP_CTRL_HOLD) != 0)
@@ -1965,29 +2948,14 @@ u32 menu(void)
       case CURSOR_LTRIGGER:
         if (current_menu == &main_menu)
           menu_load_file();
+        if (current_menu == &savestate_menu)
+          menu_load_state_file();
         if (current_menu == &cheats_misc_menu)
           menu_load_cheat_file();
         break;
 
       case CURSOR_DEFAULT:
 	  {
-        /*if (current_menu == &emulator_menu)
-		{	
-			option_screen_scale = SCALED_X15_GU;
-			option_screen_mag = 170;
-			option_screen_filter = FILTER_BILINEAR;
-			psp_fps_debug = 0;
-			option_frameskip_type = FRAMESKIP_AUTO;
-			option_frameskip_value = 9;
-			option_clock_speed = PSP_CLOCK_333;
-			option_sound_volume = 10;
-			option_stack_optimize = 1;
-			option_boot_mode = 0;
-			option_update_backup = 0;
-			option_screen_capture_format = 0;
-			option_enable_analog = 0;
-			option_analog_sensitivity = 4;
-		}*/
 	}
         break;
 
@@ -1995,6 +2963,11 @@ u32 menu(void)
         if (current_menu == &main_menu)
         {
           menu_exit();
+        }
+        else if (current_menu == &custom_colors_menu)
+        {
+          menu_init();
+          choose_menu(&theme_menu);
         }
         else
         {
@@ -2008,13 +2981,22 @@ u32 menu(void)
         {
           case (ACTION_OPTION | SUBMENU_OPTION):
             if (current_option->action_function != NULL)
+            {
+              if (current_menu == &custom_colors_menu)
+                color_picker_item_index = current_option_num;
               current_option->action_function();
+            }
             choose_menu(current_option->sub_menu);
             break;
 
           case ACTION_OPTION:
             if (current_option->action_function != NULL)
+            {
+              /* For Custom Colors menu, pass the selected item index to file-scope picker */
+              if (current_menu == &custom_colors_menu)
+                color_picker_item_index = current_option_num;
               current_option->action_function();
+            }
             else
             {
               // Handle menu actions inline to avoid corrupted function pointers
@@ -2037,22 +3019,20 @@ u32 menu(void)
                       repeat = 0;
                     }
                     break;
-                  case 4:  // Screen Capture
-                    menu_screen_capture();
-                    break;
-                  case 11: // Load Game
+                  case 12: // Load Game
                     menu_load_file();
                     break;
-                  case 13: // Reset
+                  case 13: // Reset ROM
                     menu_reset();
                     break;
                   case 14: // Return to Game
-                    repeat = 0;
+                    if (!first_load)
+                      repeat = 0;
                     break;
-                  case 16: // Suspend
+                  case 17: // Sleep Mode
                     menu_suspend();
                     break;
-                  case 17: // Quit
+                  case 18: // Exit ReTempGBA
                     quit();
                     break;
                   default:
@@ -2089,17 +3069,6 @@ u32 menu(void)
                     break;
                 }
               }
-              else if (current_menu == &emulator_menu)
-              {
-                switch (current_option->line_number)
-                {
-                  case 17: // Default
-                    menu_default();
-                    break;
-                  default:
-                    break;
-                }
-              }
             }
             break;
 
@@ -2113,12 +3082,24 @@ u32 menu(void)
         break;
 
       case CURSOR_BACK:
+        /* Square: reset current color to preset default in Custom Colors list */
+        if (current_menu == &custom_colors_menu)
+        {
+          if (current_option_num < NUM_COLOR_ITEMS)
+          {
+            menu_reset_single_color(current_option_num);
+            break;
+          }
+        }
+        /* fall through for other menus */
       case CURSOR_NONE:
         break;
     }
 
   } /* end while */
 
+  /* Restore HOME to emulator menu mode (disable OS popup) */
+  sceImposeSetHomePopup(0);
 
   scePowerLock(0);
 
@@ -2188,28 +3169,38 @@ static void update_status_string(char *time_str, char *batt_str, u16 *color_batt
 
   if (scePowerIsPowerOnline() == 1)
   {
-    sprintf(batt_str, "%s%s", batt_str, MSG[MSG_CHARGE]);
+    char tmp[40];
+    sprintf(tmp, "%s%s", batt_str, MSG[MSG_CHARGE]);
+    strcpy(batt_str, tmp);
   }
   else
   {
     batt_life_time = scePowerGetBatteryLifeTime();
 
     if (batt_life_time < 0)
-      sprintf(batt_str, "%s%s", batt_str, "[--:--]");
+    {
+      char tmp[40];
+      sprintf(tmp, "%s%s", batt_str, "[--:--]");
+      strcpy(batt_str, tmp);
+    }
     else
-      sprintf(batt_str, "%s[%2d:%02d]", batt_str, (batt_life_time / 60) % 100, batt_life_time % 60);
+    {
+      char tmp[40];
+      sprintf(tmp, "%s[%2d:%02d]", batt_str, (batt_life_time / 60) % 100, batt_life_time % 60);
+      strcpy(batt_str, tmp);
+    }
   }
 
   if (scePowerIsBatteryCharging() == 1)
   {
-    *color_batt = COLOR_BATT_CHARG;
+    *color_batt = color_batt_charg;
   }
   else
   {
     if (scePowerIsLowBattery() == 1)
-      *color_batt = COLOR_BATT_LOW;
+      *color_batt = color_batt_low;
     else
-      *color_batt = COLOR_BATT_NORMAL;
+      *color_batt = color_batt_normal;
   }
 }
 
@@ -2253,28 +3244,38 @@ static void update_status_string_gbk(char *time_str, char *batt_str, u16 *color_
 
   if (scePowerIsPowerOnline() == 1)
   {
-    sprintf(batt_str, "%s%s", batt_str, MSG[MSG_CHARGE]);
+    char tmp[40];
+    sprintf(tmp, "%s%s", batt_str, MSG[MSG_CHARGE]);
+    strcpy(batt_str, tmp);
   }
   else
   {
     batt_life_time = scePowerGetBatteryLifeTime();
 
     if (batt_life_time < 0)
-      sprintf(batt_str, "%s%s", batt_str, "[--:--]");
+    {
+      char tmp[40];
+      sprintf(tmp, "%s%s", batt_str, "[--:--]");
+      strcpy(batt_str, tmp);
+    }
     else
-      sprintf(batt_str, "%s[%2d:%02d]", batt_str, (batt_life_time / 60) % 100, batt_life_time % 60);
+    {
+      char tmp[40];
+      sprintf(tmp, "%s[%2d:%02d]", batt_str, (batt_life_time / 60) % 100, batt_life_time % 60);
+      strcpy(batt_str, tmp);
+    }
   }
 
   if (scePowerIsBatteryCharging() == 1)
   {
-    *color_batt = COLOR_BATT_CHARG;
+    *color_batt = color_batt_charg;
   }
   else
   {
     if (scePowerIsLowBattery() == 1)
-      *color_batt = COLOR_BATT_LOW;
+      *color_batt = color_batt_low;
     else
-      *color_batt = COLOR_BATT_NORMAL;
+      *color_batt = color_batt_normal;
   }
 }
 
@@ -2304,6 +3305,7 @@ static void get_timestamp_string(char *buffer, u16 msg_id, ScePspDateTime *msg_t
 /*-----------------------------------------------------------------------------
   Save Config Files
 -----------------------------------------------------------------------------*/
+
 
 static s32 save_game_config_file(void)
 {
@@ -2393,11 +3395,14 @@ s32 save_config_file(void)
     file_options[18] = option_hblank_irq_window_start % 228;
     file_options[19] = option_hblank_irq_window_end % 228;
     file_options[20] = option_psp_vsync % 2;
+    file_options[20] = option_theme % 9;
 
     for (i = 0; i < 16; i++)
     {
-      file_options[21 + i] = gamepad_config_map[i];
+      file_options[22 + i] = gamepad_config_map[i];
     }
+
+    file_options[37] = option_swap_confirm_buttons;
 
     FILE_WRITE_ARRAY(config_file, file_options);
     FILE_CLOSE(config_file);
@@ -2455,6 +3460,7 @@ s32 load_game_config_file(void)
           menu_button = i;
       }
 
+      // hardcode triangle to main menu when home button is not available
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -2549,10 +3555,12 @@ s32 load_config_file(void)
       option_screen_capture_format = file_options[14] % 2;
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 4;
+      option_language       = file_options[17] % 5;
       option_hblank_irq_window_start = file_options[18] % 228;
       option_hblank_irq_window_end = file_options[19] % 228;
       option_psp_vsync = file_options[20] % 2;
+      option_theme = file_options[20] % 9;
+      apply_theme(option_theme);
 
       for (i = 0; i < 16; i++)
       {
@@ -2562,6 +3570,9 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
+      option_swap_confirm_buttons = file_options[37] % 2;
+
+      // hardcode triangle to main menu when home button is not available
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -2608,10 +3619,74 @@ s32 load_config_file(void)
       option_screen_capture_format = file_options[14] % 2;
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 4;
+      option_language       = file_options[17] % 5;
+      option_hblank_irq_window_start = file_options[18] % 228;
+      option_hblank_irq_window_end = file_options[19] % 228;
+      option_theme = file_options[20] % 9;
+      apply_theme(option_theme);
+
+      for (i = 0; i < 16; i++)
+      {
+        gamepad_config_map[i] = file_options[21 + i] % (BUTTON_ID_NONE + 1);
+
+        if (gamepad_config_map[i] == BUTTON_ID_MENU)
+          menu_button = i;
+      }
+
+      if ((enable_home_menu == 0) && (menu_button == -1))
+        gamepad_config_map[0] = BUTTON_ID_MENU;
+
+      option_swap_confirm_buttons = 0;
+
+      FILE_CLOSE(config_file);
+    }
+    else if (file_size == (GPSP_CONFIG_NUM_PRE_THEME * 4))
+    {
+      u32 i;
+      u32 file_options[file_size / 4];
+      s32 menu_button = -1;
+
+      FILE_READ_ARRAY(config_file, file_options);
+
+      option_screen_scale   = file_options[0] % 5;
+      option_screen_mag     = file_options[1] % 201;
+      option_screen_filter  = file_options[2] % 2;
+      psp_fps_debug       = file_options[3] % 2;
+      option_frameskip_type  = file_options[4] % 3;
+      option_frameskip_value = file_options[5];
+      option_clock_speed     = file_options[6] % 4;
+      option_sound_volume   = file_options[7] % 11;
+      option_stack_optimize = file_options[8] % 2;
+      {
+        u32 stored_ram_dynarec_policy = file_options[9];
+        if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
+        {
+          option_ram_dynarec_policy = stored_ram_dynarec_policy - 4;
+        }
+        else if (stored_ram_dynarec_policy <= 1)
+        {
+          /* Migration path from old bool option:
+           * OFF(0)->Partial no reuse, ON(1)->Partial with reuse. */
+          option_ram_dynarec_policy = stored_ram_dynarec_policy + 1;
+        }
+        else
+        {
+          option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+        }
+      }
+      option_video_renderer = file_options[10] % 2;
+      option_oam_hijacking_enabled = file_options[11] % 2;
+      option_boot_mode      = file_options[12] % 2;
+      option_update_backup  = file_options[13] % 2;
+      option_screen_capture_format = file_options[14] % 2;
+      option_enable_analog  = file_options[15] % 2;
+      option_analog_sensitivity = file_options[16] % 10;
+      option_language       = file_options[17] % 5;
       option_hblank_irq_window_start = file_options[18] % 228;
       option_hblank_irq_window_end = file_options[19] % 228;
       option_psp_vsync = 0;
+      option_theme = 0;
+      apply_theme(0);
 
       for (i = 0; i < 16; i++)
       {
@@ -2621,6 +3696,7 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
+      // hardcode triangle to main menu when home button is not available
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -2665,7 +3741,7 @@ s32 load_config_file(void)
       option_screen_capture_format = file_options[14] % 2;
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 4;
+      option_language       = file_options[17] % 5;
       load_hblank_irq_window_from_cap(file_options[18] % 228);
 
       for (i = 0; i < 16; i++)
@@ -2676,6 +3752,7 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
+      // hardcode triangle to main menu when home button is not available
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -2720,9 +3797,11 @@ s32 load_config_file(void)
       option_screen_capture_format = file_options[14] % 2;
       option_enable_analog  = file_options[15] % 2;
       option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 4;
+      option_language       = file_options[17] % 5;
       option_hblank_irq_window_start = 1;
       option_hblank_irq_window_end = 160;
+      option_theme = 0;
+      apply_theme(0);
 
       for (i = 0; i < 16; i++)
       {
@@ -2732,6 +3811,7 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
+      // hardcode triangle to main menu when home button is not available
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -2770,7 +3850,7 @@ s32 load_config_file(void)
       option_screen_capture_format = file_options[13] % 2;
       option_enable_analog  = file_options[14] % 2;
       option_analog_sensitivity = file_options[15] % 10;
-      option_language       = file_options[16] % 4;
+      option_language       = file_options[16] % 5;
 
       for (i = 0; i < 16; i++)
       {
@@ -2780,11 +3860,14 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
+      // hardcode triangle to main menu when home button is not available
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
       option_hblank_irq_window_start = 1;
       option_hblank_irq_window_end = 160;
+      option_theme = 0;
+      apply_theme(0);
 
       FILE_CLOSE(config_file);
     }
@@ -2813,7 +3896,7 @@ s32 load_config_file(void)
       option_screen_capture_format = file_options[11] % 2;
       option_enable_analog  = file_options[12] % 2;
       option_analog_sensitivity = file_options[13] % 10;
-      option_language       = file_options[14] % 4;
+      option_language       = file_options[14] % 5;
 
       for (i = 0; i < 16; i++)
       {
@@ -2822,6 +3905,7 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
+      // hardcode triangle to main menu when home button is not available
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -2833,6 +3917,7 @@ s32 load_config_file(void)
     else
       FILE_CLOSE(config_file);
 
+    apply_theme(option_theme);
     return 0;
   }
 
@@ -2852,18 +3937,20 @@ s32 load_config_file(void)
   option_analog_sensitivity = 4;
   option_hblank_irq_window_start = 1;
   option_hblank_irq_window_end = 160;
-  option_psp_vsync = 0;
+  option_theme = 0;
 
   int id_language;
   sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);
   if (id_language == PSP_SYSTEMPARAM_LANGUAGE_JAPANESE)
-    option_language = 0;
-  else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_SIMPLIFIED)
-    option_language = 2;
-  else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_TRADITIONAL)
-    option_language = 3;
-  else
-    option_language = 1;
+		option_language = 0;
+	else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_SIMPLIFIED)
+		option_language = 2;
+	else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_TRADITIONAL)
+		option_language = 3;
+  else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_ITALIAN)
+		option_language = 4;
+	else
+		option_language = 1; // english
 
   return -1;
 }
@@ -3002,6 +4089,7 @@ s32 load_dir_cfg(char *file_name)
   strcpy(dir_cfg,   main_path);
   strcpy(dir_snap,  main_path);
   strcpy(dir_cheat, main_path);
+  apply_theme(option_theme);
   return -1;
 }
 
@@ -3078,4 +4166,3 @@ static void save_bmp(const char *path, u16 *screen_image)
 
   free(bmp_data);
 }
-

@@ -35,6 +35,9 @@ s32 load_game_config_file(void);
 s32 load_config_file(void);
 s32 save_config_file(void);
 
+s32 save_theme_config(void);
+s32 load_theme_config(void);
+
 s32 load_dir_cfg(char *file_name);
 
 u32 menu(void);
