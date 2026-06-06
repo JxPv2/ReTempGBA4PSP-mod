@@ -24,7 +24,8 @@
 #define GPSP_CONFIG_NUM_GAMEPAD         16
 #define GPSP_CONFIG_NUM_PRE_EXTRA_SLOT  (18 + GPSP_CONFIG_NUM_GAMEPAD) // 34 words: options 0-17, gamepad 18-33
 #define GPSP_CONFIG_NUM_PRE_WINDOW_END  (19 + GPSP_CONFIG_NUM_GAMEPAD) // 35 words: + slot 18 = HBLANK cap, gamepad 19-34
-#define GPSP_CONFIG_NUM                 (20 + GPSP_CONFIG_NUM_GAMEPAD) // 36 words: slots 18-19 HBLANK win, gamepad 20-35
+#define GPSP_CONFIG_NUM_PRE_VSYNC       (20 + GPSP_CONFIG_NUM_GAMEPAD) // 36 words: slots 18-19 HBLANK win, gamepad 20-35
+#define GPSP_CONFIG_NUM                 (21 + GPSP_CONFIG_NUM_GAMEPAD) // 37 words: slot 20 PSP VSync, gamepad 21-36
 #define GPSP_CONFIG_NUM_LEGACY          (17 + GPSP_CONFIG_NUM_GAMEPAD) // before renderer option
 #define GPSP_GAME_CONFIG_NUM  (7 + 16)
 
@@ -1261,6 +1262,7 @@ u32 menu(void)
 	option_analog_sensitivity = 4;
 	option_hblank_irq_window_start = 1;
 	option_hblank_irq_window_end = 160;
+	option_psp_vsync = 0;
 	//int id_language;
 	sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);
 	if (id_language == PSP_SYSTEMPARAM_LANGUAGE_JAPANESE)
@@ -1624,7 +1626,9 @@ u32 menu(void)
 
     STRING_SELECTION_OPTION(NULL, "OAM hijack support: %s", on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 7),
 
-    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 9)
+    STRING_SELECTION_OPTION(NULL, "VSync (PSP)       : %s", on_off_options, &option_psp_vsync, 2, MSG_OPTION_MENU_HELP_7, 8),
+
+    ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 10)
   };
 
   MAKE_MENU(graphics, NULL, NULL);
@@ -2388,10 +2392,11 @@ s32 save_config_file(void)
     file_options[17] = option_language;
     file_options[18] = option_hblank_irq_window_start % 228;
     file_options[19] = option_hblank_irq_window_end % 228;
+    file_options[20] = option_psp_vsync % 2;
 
     for (i = 0; i < 16; i++)
     {
-      file_options[20 + i] = gamepad_config_map[i];
+      file_options[21 + i] = gamepad_config_map[i];
     }
 
     FILE_WRITE_ARRAY(config_file, file_options);
@@ -2547,6 +2552,66 @@ s32 load_config_file(void)
       option_language       = file_options[17] % 4;
       option_hblank_irq_window_start = file_options[18] % 228;
       option_hblank_irq_window_end = file_options[19] % 228;
+      option_psp_vsync = file_options[20] % 2;
+
+      for (i = 0; i < 16; i++)
+      {
+        gamepad_config_map[i] = file_options[21 + i] % (BUTTON_ID_NONE + 1);
+
+        if (gamepad_config_map[i] == BUTTON_ID_MENU)
+          menu_button = i;
+      }
+
+      if ((enable_home_menu == 0) && (menu_button == -1))
+        gamepad_config_map[0] = BUTTON_ID_MENU;
+
+      FILE_CLOSE(config_file);
+    }
+    else if (file_size == (GPSP_CONFIG_NUM_PRE_VSYNC * 4))
+    {
+      u32 i;
+      u32 file_options[file_size / 4];
+      s32 menu_button = -1;
+
+      FILE_READ_ARRAY(config_file, file_options);
+
+      option_screen_scale   = file_options[0] % 5;
+      option_screen_mag     = file_options[1] % 201;
+      option_screen_filter  = file_options[2] % 2;
+      psp_fps_debug       = file_options[3] % 2;
+      option_frameskip_type  = file_options[4] % 3;
+      option_frameskip_value = file_options[5];
+      option_clock_speed     = file_options[6] % 4;
+      option_sound_volume   = file_options[7] % 11;
+      option_stack_optimize = file_options[8] % 2;
+      {
+        u32 stored_ram_dynarec_policy = file_options[9];
+        if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
+        {
+          option_ram_dynarec_policy = stored_ram_dynarec_policy - 4;
+        }
+        else if (stored_ram_dynarec_policy <= 1)
+        {
+          /* Migration path from old bool option:
+           * OFF(0)->Partial no reuse, ON(1)->Partial with reuse. */
+          option_ram_dynarec_policy = stored_ram_dynarec_policy + 1;
+        }
+        else
+        {
+          option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+        }
+      }
+      option_video_renderer = file_options[10] % 2;
+      option_oam_hijacking_enabled = file_options[11] % 2;
+      option_boot_mode      = file_options[12] % 2;
+      option_update_backup  = file_options[13] % 2;
+      option_screen_capture_format = file_options[14] % 2;
+      option_enable_analog  = file_options[15] % 2;
+      option_analog_sensitivity = file_options[16] % 10;
+      option_language       = file_options[17] % 4;
+      option_hblank_irq_window_start = file_options[18] % 228;
+      option_hblank_irq_window_end = file_options[19] % 228;
+      option_psp_vsync = 0;
 
       for (i = 0; i < 16; i++)
       {
@@ -2787,6 +2852,7 @@ s32 load_config_file(void)
   option_analog_sensitivity = 4;
   option_hblank_irq_window_start = 1;
   option_hblank_irq_window_end = 160;
+  option_psp_vsync = 0;
 
   int id_language;
   sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);

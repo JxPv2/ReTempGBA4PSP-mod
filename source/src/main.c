@@ -53,6 +53,7 @@ u32 option_clock_speed = PSP_CLOCK_333;
 
 u32 option_hblank_irq_window_start = 1;
 u32 option_hblank_irq_window_end = 160;
+u32 option_psp_vsync = 0;
 
 char main_path[MAX_PATH];
 
@@ -433,7 +434,7 @@ u32 update_gba(void)
           __draw_volume_status(draw_this_frame);
 
           if (draw_this_frame != 0)
-            flip_screen(0);
+            flip_screen(option_psp_vsync);
 
           vcount = 0;
         }
