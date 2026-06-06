@@ -30,10 +30,6 @@ extern u32 option_oam_hijacking_enabled;  // Emulator option for OAM hijacking
 #define GBA_SCREEN_PITCH GBA_LINE_SIZE
 #endif
 
-#ifndef REG_MOSAIC
-#define REG_MOSAIC 0x04C
-#endif
-
 #ifndef REG_BGxCNT
 #define REG_BGxCNT(layer) (REG_BG0CNT + (layer))
 #define REG_BGxHOFS(layer) (REG_BG0HOFS + ((layer) * 2))
