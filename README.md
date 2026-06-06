@@ -11,7 +11,7 @@ Based on andymcca' Github repo which is based on phoe-nix' Github repo.
   -   Starsky and Hutch
   -   Balatro (https://github.com/cellos51/balatro-gba)
   -   ....and probably a few more!
-- ~~Swapped X/O buttons around~~    (You can choose which button to use for confirm)
+- ~~Swapped X/O buttons around~~    (You can choose which button X/O to use for confirm)
 - ~~Couple of minor fixes to make it work under PPSSPP (including w/ HW Rendering)~~    (on PPSSPP will only work with SW Rendering)
 
 ## Building
