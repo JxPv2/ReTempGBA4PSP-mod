@@ -14,8 +14,18 @@ ENCRYPT = 1
 PSP_FW_VERSION = 371
 PSP_LARGE_MEMORY = 1
 
+# XMB ICON
 PSP_EBOOT_ICON = res/ICON0.png
-PSP_EBOOT_TITLE = TempGBA mod
+# XMB ICON ANIMATED
+#PSP_EBOOT_ICON1 = res/ICON1.PMF
+# XMB BACKGROUND
+PSP_EBOOT_PIC1 = res/PIC1.png
+# XMB OVERLAY ICON
+PSP_EBOOT_PIC0 = res/PIC0.png
+# XMB SOUND
+PSP_EBOOT_SND0 = res/SND0.AT3
+# APP NAME
+PSP_EBOOT_TITLE = ReTempGBA-Testing
 
 EXTRA_TARGETS = EBOOT.PBP
 
@@ -57,3 +67,6 @@ LIBS = src/libpower/libpsppower.a -lpspgu -lpsprtc -lpspaudio -lpspkubridge
 
 include ${PSPSDK}/lib/build.mak
 
+all: $(EXTRA_TARGETS)
+	@$(MAKE) -C prx/exceptionHandler/prx
+	@cp prx/exceptionHandler/prx/exception.prx .
