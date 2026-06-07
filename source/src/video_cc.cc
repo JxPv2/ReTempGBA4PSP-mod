@@ -1912,7 +1912,7 @@ static void order_layers(u32 layer_flags, u32 vcnt)
 // Here follow the mask value to separate/expand the color to 32 bit,
 // the mask to detect overflows in the blend operation and
 
-// ReTempGBA/PSP uses 5-5-5 channel semantics in the blend path.
+// TempGBA/PSP uses 5-5-5 channel semantics in the blend path.
 // Keep masks aligned with the proven C renderer (`video.c`) behavior.
 #define OVFG_MSK 0x04000000
 #define OVFR_MSK 0x00008000
