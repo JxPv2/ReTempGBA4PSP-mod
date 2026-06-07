@@ -46,14 +46,14 @@ void ExceptionHandler(PspDebugRegBlock *regs)
     for (i=0; i<32; i+=4) pspDebugScreenPrintf("%s:%08X %s:%08X %s:%08X %s:%08X\n", regName[i], (int)regs->r[i], regName[i+1], (int)regs->r[i+1], regName[i+2], (int)regs->r[i+2], regName[i+3], (int)regs->r[i+3]);
 
     sceKernelDelayThread(1000000);
-    pspDebugScreenPrintf("\n\nPress X to dump information on file retempgba_crash.log and quit");
+    pspDebugScreenPrintf("\n\nPress X to dump information on file tempgba_crash.log and quit");
     pspDebugScreenPrintf("\nPress O to quit");
 
     for (;;) {
         sceCtrlReadBufferPositive(&pad, 1);
         if (pad.Buttons & PSP_CTRL_CROSS) {
             char filename[MAX_FILE];
-            sprintf(filename, "%sretempgba_crash.log", main_path);
+            sprintf(filename, "%stempgba_crash.log", main_path);
             FILE *log = fopen(filename, "w");
             if (log != NULL) {
                 char testo[512];
