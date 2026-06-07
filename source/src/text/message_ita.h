@@ -57,7 +57,7 @@
   "Modalita riposo",
 
   // MSG_MAIN_MENU_11
-  "Esci da ReTempGBA",
+  "Esci da TempGBA",
 
   // MSG_MAIN_MENU_HELP_0
   FONT_BTN_CIRCLE_GBK ":Carica   " FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":Cambia slot",
@@ -680,7 +680,7 @@
   "Opzioni emulatore",
 
   // MSG_PREVIEW_TITLE
-  "ReTempGBA",
+  "TempGBA",
 
   // MSG_PREVIEW_ITEM_0
   "Caricamento rapido",
