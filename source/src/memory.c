@@ -1560,6 +1560,7 @@ CPU_ALERT_TYPE write_io_register16(u32 address, u32 value)
 
     // Sound 1 control sweep
     case 0x60:
+      value &= 0x007F;
       gbc_sound_tone_control_sweep(value);
       ADDRESS16(io_registers, 0x60) = value;
       break;
@@ -1573,7 +1574,7 @@ CPU_ALERT_TYPE write_io_register16(u32 address, u32 value)
     // Sound 1 control frequency
     case 0x64:
       gbc_sound_tone_control_high(0, value);
-      ADDRESS16(io_registers, 0x64) = value;
+      ADDRESS16(io_registers, 0x64) = value & 0x47FF;
       break;
 
     // Sound 2 control duty/length/envelope
@@ -1585,13 +1586,13 @@ CPU_ALERT_TYPE write_io_register16(u32 address, u32 value)
     // Sound 2 control frequency
     case 0x6C:
       gbc_sound_tone_control_high(1, value);
-      ADDRESS16(io_registers, 0x6C) = value;
+      ADDRESS16(io_registers, 0x6C) = value & 0x47FF;
       break;
 
     // Sound 3 control wave
     case 0x70:
       gbc_sound_wave_control(value);
-      ADDRESS16(io_registers, 0x70) = value;
+      ADDRESS16(io_registers, 0x70) = value & 0x00E0;
       break;
 
     // Sound 3 control length/volume
@@ -1615,19 +1616,19 @@ CPU_ALERT_TYPE write_io_register16(u32 address, u32 value)
     // Sound 4 control frequency
     case 0x7C:
       gbc_sound_noise_control(value);
-      ADDRESS16(io_registers, 0x7C) = value;
+      ADDRESS16(io_registers, 0x7C) = value & 0x40FF;
       break;
 
     // Sound control L
     case 0x80:
       sound_control_low(value);
-      ADDRESS16(io_registers, 0x80) = value;
+      ADDRESS16(io_registers, 0x80) = value & 0xFF77;
       break;
 
     // Sound control H
     case 0x82:
       sound_control_high(value);
-      ADDRESS16(io_registers, 0x82) = value;
+      ADDRESS16(io_registers, 0x82) = value & 0x770F;
       break;
 
     // Sound control X
