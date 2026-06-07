@@ -1,6 +1,6 @@
-# ReTempGBA4PSP-mod (2025 Build)
+# TempGBA4PSP-mod (2025 Build)
 
-Based on andymcca' Github repo which is based on phoe-nix' Github repo.
+Based on phoe-nix' Github repo.
 
 - Added a 16:9 Full Screen option
 - Fixed Menu text and Game -> Menu crashes
