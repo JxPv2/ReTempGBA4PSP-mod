@@ -27,7 +27,7 @@
 #define STACK_SIZE_KB  (512)
 #define ATTRIBUTE      (THREAD_ATTR_USER | PSP_THREAD_ATTR_CLEAR_STACK)
 
-PSP_MODULE_INFO("PSP ReTempGBA", PSP_MODULE_USER, 0, 9);
+PSP_MODULE_INFO("PSP TempGBA", PSP_MODULE_USER, 0, 9);
 PSP_MAIN_THREAD_PARAMS(PRIORITY, STACK_SIZE_KB, ATTRIBUTE);
 PSP_HEAP_SIZE_KB(-800);
 
@@ -804,7 +804,7 @@ static void setup_main(void)
   //   enable_home_menu = 0;
   // else
   //   enable_home_menu = 1;
-  enable_home_menu = 1;  // Always disable home menu without kernel mode
+  enable_home_menu = 1;
 
   load_config_file();
   load_theme_config();
