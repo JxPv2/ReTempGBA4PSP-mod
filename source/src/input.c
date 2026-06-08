@@ -437,3 +437,4 @@ void input_write_mem_savestate(SceUID savestate_file)
 {
   INPUT_SAVESTATE_BODY(WRITE_MEM);
 }
+
