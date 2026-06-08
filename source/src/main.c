@@ -1206,3 +1206,4 @@ void main_write_mem_savestate(SceUID savestate_file)
 {
   MAIN_SAVESTATE_BODY(WRITE_MEM);
 }
+
