@@ -312,3 +312,4 @@ int save_png(const char *path, u16 *screen_image)
 
   return res;
 }
+
