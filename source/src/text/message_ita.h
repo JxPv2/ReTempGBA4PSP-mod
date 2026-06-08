@@ -102,34 +102,34 @@
   "Opzioni prestazioni",
 
   // MSG_OPTION_MENU_0
-  "Modalita display          : %s",
+  "Modalita display : %s",
 
   // MSG_OPTION_MENU_1
-  "Ingrandimento             : %d%%",
+  "Ingrandimento    : %d%%",
 
   // MSG_OPTION_MENU_2
-  "Filtro bilineare          : %s",
+  "Filtro bilineare : %s",
 
   // MSG_OPTION_MENU_SHOW_FPS
   "Mostra FPS            : %s",
 
   // MSG_OPTION_MENU_3
-  "Tipo di frameskip          : %s",
+  "Tipo di frameskip    : %s",
 
   // MSG_OPTION_MENU_4
-  "Valore frameskip           : %d",
+  "Valore frameskip     : %d",
 
   // MSG_OPTION_MENU_5
-  "Frequenza clock CPU        : %s",
+  "Frequenza clock CPU  : %s",
 
   // MSG_OPTION_MENU_6
   "Volume suoni          : %s",
 
   // MSG_OPTION_MENU_7
-  "Ottimizzazione dello stack : %s",
+  "Ottimizzazione stack : %s",
 
   // MSG_OPTION_MENU_8
-  "Avvio dal BIOS             : %s",
+  "Avvio dal BIOS       : %s",
 
   // MSG_OPTION_MENU_9
   "Aggiornamento backup  : %s",
@@ -186,19 +186,19 @@
   FONT_BTN_CIRCLE_GBK ":Menu principale   " FONT_BTN_CROSS_GBK ":Esci",
 
   // MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE
-  "Modalita RAM dynarec       : %s",
+  "Modalita RAM dynarec : %s",
 
   // MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE
   FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":Cambia   " FONT_BTN_CROSS_GBK ":Esci",
 
   // MSG_OPTION_MENU_HBLANK_IRQ_WIN_START
-  "Inizio HBLANK IRQ          : %d",
+  "Inizio HBLANK IRQ    : %d",
 
   // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START
   FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=off  1+=prima linea scansione   " FONT_BTN_CROSS_GBK ":Esci",
 
   // MSG_OPTION_MENU_HBLANK_IRQ_WIN_END
-  "Fine HBLANK IRQ            : %d",
+  "Fine HBLANK IRQ      : %d",
 
   // MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END
   FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":0=off  1-227=ultima linea scansione   " FONT_BTN_CROSS_GBK ":Esci",
@@ -605,13 +605,13 @@
   "Cattura schermata     : %s",
 
   // MSG_OPTION_MENU_VIDEORENDER
-  "Render video              : %s",
+  "Render video     : %s",
 
   // MSG_OPTION_MENU_OAMHIJACKSUPPORT
-  "Supporto dirottamento OAM : %s",
+  "Dirottamento OAM : %s",
 
   // MSG_OPTION_MENU_VSYNCPSP
-  "VSync (PSP)               : %s",
+  "VSync (PSP)      : %s",
 
   // MSG_OPTION_MENU_THEMES
   "Temi predefiniti      : %s",
