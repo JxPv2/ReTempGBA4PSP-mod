@@ -420,7 +420,8 @@ static void draw_theme_preview(u16 editing_color_ptr_value)
     }
 
     /* Scroll bar on the left edge */
-    draw_box_fill(px + 2, py + 18, px + 6, py + ph - 18, color_scroll_bar);
+    draw_box_line(px + 2, py + 18, px + 6, py + ph - 18, color_scroll_bar);
+    draw_box_fill(px + 4, py + 20, px + 4, py + ph - 70, color_scroll_bar);
 
     /* Battery indicator in top-right corner — reflects the state being edited */
     {
@@ -796,7 +797,7 @@ s32 load_theme_config(void)
 
 // scroll bar
 #define SBAR_X1  (2)
-#define SBAR_X2  (12)
+#define SBAR_X2  (6) // 12 default
 #define SBAR_Y1  (16)
 #define SBAR_Y2  (255)
 
@@ -3579,6 +3580,7 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
+      // hardcode triangle to main menu when home button is not enabled
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
