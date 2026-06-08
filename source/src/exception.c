@@ -106,3 +106,4 @@ void initExceptionHandler(void)
       sceKernelStartModule(modid, 8, args, &fd, NULL);
    }
 }
+
