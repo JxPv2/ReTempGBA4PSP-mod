@@ -3274,13 +3274,13 @@ static s32 save_game_config_file(void)
     u32 i;
     u32 file_options[GPSP_GAME_CONFIG_NUM];
 
-    file_options[0]  = option_screen_scale;
-    file_options[1]  = option_screen_mag;
-    file_options[2]  = option_screen_filter;
-    file_options[3]  = option_frameskip_type;
-    file_options[4]  = option_frameskip_value;
-    file_options[5]  = option_clock_speed;
-    file_options[6]  = option_sound_volume;
+    file_options[0] = option_screen_scale;
+    file_options[1] = option_screen_mag;
+    file_options[2] = option_screen_filter;
+    file_options[3] = option_frameskip_type;
+    file_options[4] = option_frameskip_value;
+    file_options[5] = option_clock_speed;
+    file_options[6] = option_sound_volume;
 
     for (i = 0; i < 16; i++)
     {
@@ -3318,15 +3318,15 @@ s32 save_config_file(void)
     u32 i;
     u32 file_options[GPSP_CONFIG_NUM];
 
-    file_options[0]   = option_screen_scale;
-    file_options[1]   = option_screen_mag;
-    file_options[2]   = option_screen_filter;
-    file_options[3]   = psp_fps_debug;
-    file_options[4]   = option_frameskip_type;
-    file_options[5]   = option_frameskip_value;
-    file_options[6]   = option_clock_speed;
-    file_options[7]   = option_sound_volume;
-    file_options[8]   = option_stack_optimize;
+    file_options[0] = option_screen_scale;
+    file_options[1] = option_screen_mag;
+    file_options[2] = option_screen_filter;
+    file_options[3] = psp_fps_debug;
+    file_options[4] = option_frameskip_type;
+    file_options[5] = option_frameskip_value;
+    file_options[6] = option_clock_speed;
+    file_options[7] = option_sound_volume;
+    file_options[8] = option_stack_optimize;
     /* Store mode with +4 marker so old 0/1 boolean configs can be migrated. */
     file_options[9]   = option_ram_dynarec_policy + 4;
     file_options[10]  = option_video_renderer;
@@ -3342,7 +3342,7 @@ s32 save_config_file(void)
     file_options[20]  = option_psp_vsync % 2;
     file_options[21]  = option_swap_confirm_buttons;
     file_options[22]  = option_theme % 9;
-    
+
 
     for (i = 0; i < 16; i++)
     {
