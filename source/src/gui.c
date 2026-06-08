@@ -22,18 +22,15 @@
 
 extern u32 option_swap_confirm_buttons;
 
-#define THEME_CONFIG_FILENAME "retempgba_theme.cfg"
-
-#define GPSP_CONFIG_FILENAME  "retempgba_config.cfg"
+#define GPSP_THEME_FILENAME             "tempgba_theme.cfg"
+#define GPSP_CONFIG_FILENAME            "tempgba.cfg"
 #define GPSP_CONFIG_NUM_GAMEPAD         16
 #define GPSP_CONFIG_NUM_PRE_EXTRA_SLOT  (18 + GPSP_CONFIG_NUM_GAMEPAD) // 34 words: options 0-17, gamepad 18-33
 #define GPSP_CONFIG_NUM_PRE_WINDOW_END  (19 + GPSP_CONFIG_NUM_GAMEPAD) // 35 words: + slot 18 = HBLANK cap, gamepad 19-34
-#define GPSP_CONFIG_NUM_PRE_THEME       (20 + GPSP_CONFIG_NUM_GAMEPAD) // 36 words: slots 18-19 HBLANK win, gamepad 20-35
-#define GPSP_CONFIG_NUM_PRE_SWAP        (21 + GPSP_CONFIG_NUM_GAMEPAD) // 37 words: + theme slot 20, gamepad 21-36
 #define GPSP_CONFIG_NUM_PRE_VSYNC       (20 + GPSP_CONFIG_NUM_GAMEPAD) // 36 words: slots 18-19 HBLANK win, gamepad 20-35
-#define GPSP_CONFIG_NUM                 (23 + GPSP_CONFIG_NUM_GAMEPAD) // 39 words: + swap slot 37, slot 20 PSP VSync, gamepad 21-36
+#define GPSP_CONFIG_NUM                 (23 + GPSP_CONFIG_NUM_GAMEPAD) // 39 words: slot 20 PSP VSync, slot 21 swap buttons, slot 22 themes, gamepad 23-38
 #define GPSP_CONFIG_NUM_LEGACY          (17 + GPSP_CONFIG_NUM_GAMEPAD) // before renderer option
-#define GPSP_GAME_CONFIG_NUM  (7 + 16)
+#define GPSP_GAME_CONFIG_NUM            (7 + 16)
 
 /* Runtime theme colors — initialized to OG theme defaults */
 u16 color_bg            = COLOR15( 3,  5,  8);
@@ -108,7 +105,7 @@ void apply_theme(u32 theme)
     /* When a preset is chosen, delete custom theme so preset isn't overridden on boot */
     {
         char path[MAX_PATH];
-        sprintf(path, "%s%s", main_path, THEME_CONFIG_FILENAME);
+        sprintf(path, "%s%s", main_path, GPSP_THEME_FILENAME);
         sceIoRemove(path);
     }
 }
@@ -371,7 +368,7 @@ static void draw_status_bar(void);
 /* Forward declaration for color reset */
 void menu_reset_single_color(u32 idx);
 
-#define TEXT_TOOLTIP_POS_Y     (210)
+#define TEXT_TOOLTIP_POS_Y  (210)
 #define MENU_LIST_POS_X     (10) //18 default
 
 #define SCREEN_IMAGE_POS_X  (228)
@@ -452,12 +449,12 @@ static void draw_theme_preview(u16 editing_color_ptr_value)
     if (option_language == 0)
     {
         print_string("..", dir_x, dir_y, color_inactive_dir, BG_NO_FILL);
-        print_string("[ROMs]", dir_x, dir_y + 14, color_inactive_dir, BG_NO_FILL);
+        print_string("ROMs", dir_x, dir_y + 14, color_inactive_dir, BG_NO_FILL);
     }
     else
     {
         print_string_gbk("..", dir_x, dir_y, color_inactive_dir, BG_NO_FILL);
-        print_string_gbk("[ROMs]", dir_x, dir_y + 14, color_inactive_dir, BG_NO_FILL);
+        print_string_gbk("ROMs", dir_x, dir_y + 14, color_inactive_dir, BG_NO_FILL);
     }
 
     /* Tooltip */
@@ -727,7 +724,7 @@ s32 save_theme_config(void)
 {
     SceUID fd;
     char path[MAX_PATH];
-    sprintf(path, "%s%s", main_path, THEME_CONFIG_FILENAME);
+    sprintf(path, "%s%s", main_path, GPSP_THEME_FILENAME);
 
     scePowerLock(0);
     FILE_OPEN(fd, path, WRITE);
@@ -753,7 +750,7 @@ s32 load_theme_config(void)
 {
     SceUID fd;
     char path[MAX_PATH];
-    sprintf(path, "%s%s", main_path, THEME_CONFIG_FILENAME);
+    sprintf(path, "%s%s", main_path, GPSP_THEME_FILENAME);
 
     scePowerLock(0);
     FILE_OPEN(fd, path, READ);
@@ -771,7 +768,7 @@ s32 load_theme_config(void)
             color_rom_info      = colors[1];
             color_active_item   = colors[2];
             color_inactive_item = colors[3];
-            color_tooltip_text     = colors[4];
+            color_tooltip_text  = colors[4];
             color_help_text     = colors[5];
             color_inactive_dir  = colors[6];
             color_scroll_bar    = colors[7];
@@ -847,158 +844,158 @@ struct _MenuOptionType
 typedef struct _MenuOptionType MenuOptionType;
 typedef struct _MenuType MenuType;
 
-#define MAKE_MENU(name, init_function, passive_function)                      \
-  MenuType name##_menu =                                                      \
-  {                                                                           \
-    init_function,                                                            \
-    passive_function,                                                         \
-    name##_options,                                                           \
-    sizeof(name##_options) / sizeof(MenuOptionType)                           \
-  }                                                                           \
+#define MAKE_MENU(name, init_function, passive_function)    \
+  MenuType name##_menu =                                    \
+  {                                                         \
+    init_function,                                          \
+    passive_function,                                       \
+    name##_options,                                         \
+    sizeof(name##_options) / sizeof(MenuOptionType)         \
+  }                                                         \
 
-#define GAMEPAD_CONFIG_OPTION(display_string, number, display_msg)            \
-{                                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  display_string,                                                             \
-  gamepad_config_buttons,                                                     \
-  gamepad_config_map + gamepad_config_line_to_button[number],                 \
-  sizeof(gamepad_config_buttons) / sizeof(gamepad_config_buttons[0]),         \
-  MSG_PAD_MENU_HELP_0,                                                        \
-  number,                                                                     \
-  STRING_SELECTION_OPTION,                                                    \
-  0,                                                                          \
-  display_msg                                                                 \
-}                                                                             \
+#define GAMEPAD_CONFIG_OPTION(display_string, number, display_msg)      \
+{                                                                       \
+  NULL,                                                                 \
+  NULL,                                                                 \
+  NULL,                                                                 \
+  display_string,                                                       \
+  gamepad_config_buttons,                                               \
+  gamepad_config_map + gamepad_config_line_to_button[number],           \
+  sizeof(gamepad_config_buttons) / sizeof(gamepad_config_buttons[0]),   \
+  MSG_PAD_MENU_HELP_0,                                                  \
+  number,                                                               \
+  STRING_SELECTION_OPTION,                                              \
+  0,                                                                    \
+  display_msg                                                           \
+}                                                                       \
 
-#define ANALOG_CONFIG_OPTION(display_string, number, display_msg)             \
-{                                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  display_string,                                                             \
-  gamepad_config_buttons,                                                     \
-  gamepad_config_map + number + 12,                                           \
-  sizeof(gamepad_config_buttons) / sizeof(gamepad_config_buttons[0]),         \
-  MSG_PAD_MENU_HELP_0,                                                        \
-  number,                                                                     \
-  STRING_SELECTION_OPTION,                                                    \
-  0,                                                                          \
-  display_msg                                                                 \
-}                                                                             \
+#define ANALOG_CONFIG_OPTION(display_string, number, display_msg)       \
+{                                                                       \
+  NULL,                                                                 \
+  NULL,                                                                 \
+  NULL,                                                                 \
+  display_string,                                                       \
+  gamepad_config_buttons,                                               \
+  gamepad_config_map + number + 12,                                     \
+  sizeof(gamepad_config_buttons) / sizeof(gamepad_config_buttons[0]),   \
+  MSG_PAD_MENU_HELP_0,                                                  \
+  number,                                                               \
+  STRING_SELECTION_OPTION,                                              \
+  0,                                                                    \
+  display_msg                                                           \
+}                                                                       \
 
-#define CHEAT_OPTION(number)                                                  \
-{                                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  cheat_format_str[number],                                                   \
-  enable_disable_options,                                                     \
-  &(cheats[number].cheat_active),                                             \
-  2,                                                                          \
-  MSG_CHEAT_MENU_HELP_0,                                                      \
-  (number) % 10,                                                              \
-  STRING_SELECTION_OPTION,                                                    \
-  0,                                                                          \
-  0                                                                           \
-}                                                                             \
+#define CHEAT_OPTION(number)        \
+{                                   \
+  NULL,                             \
+  NULL,                             \
+  NULL,                             \
+  cheat_format_str[number],         \
+  enable_disable_options,           \
+  &(cheats[number].cheat_active),   \
+  2,                                \
+  MSG_CHEAT_MENU_HELP_0,            \
+  (number) % 10,                    \
+  STRING_SELECTION_OPTION,          \
+  0,                                \
+  0                                 \
+}                                   \
 
-#define SAVESTATE_OPTION(number)                                              \
-{                                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  savestate_timestamps[number],                                               \
-  NULL,                                                                       \
-  &savestate_action,                                                          \
-  2,                                                                          \
-  MSG_STATE_MENU_HELP_0,                                                      \
-  number,                                                                     \
-  NUMBER_SELECTION_OPTION | ACTION_OPTION,                                    \
-  0,                                                                          \
-  0                                                                           \
-}                                                                             \
+#define SAVESTATE_OPTION(number)              \
+{                                             \
+  NULL,                                       \
+  NULL,                                       \
+  NULL,                                       \
+  savestate_timestamps[number],               \
+  NULL,                                       \
+  &savestate_action,                          \
+  2,                                          \
+  MSG_STATE_MENU_HELP_0,                      \
+  number,                                     \
+  NUMBER_SELECTION_OPTION | ACTION_OPTION,    \
+  0,                                          \
+  0                                           \
+}                                             \
 
-#define ACTION_OPTION(action_function, passive_function, display_string, help_string, line_number, display_msg) \
-{                                                                             \
-  action_function,                                                            \
-  passive_function,                                                           \
-  NULL,                                                                       \
-  display_string,                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  0,                                                                          \
-  help_string,                                                                \
-  line_number,                                                                \
-  ACTION_OPTION,                                                              \
-  0,                                                                          \
-  display_msg                                                                 \
-}                                                                             \
+#define ACTION_OPTION(action_function, passive_function, display_string, help_string, line_number, display_msg)   \
+{                                                                                                                 \
+  action_function,                                                                                                \
+  passive_function,                                                                                               \
+  NULL,                                                                                                           \
+  display_string,                                                                                                 \
+  NULL,                                                                                                           \
+  NULL,                                                                                                           \
+  0,                                                                                                              \
+  help_string,                                                                                                    \
+  line_number,                                                                                                    \
+  ACTION_OPTION,                                                                                                  \
+  0,                                                                                                              \
+  display_msg                                                                                                     \
+}                                                                                                                 \
 
-#define SUBMENU_OPTION(sub_menu, display_string, help_string, line_number, display_msg)    \
-{                                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  sub_menu,                                                                   \
-  display_string,                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  sizeof(sub_menu) / sizeof(MenuOptionType),                                  \
-  help_string,                                                                \
-  line_number,                                                                \
-  SUBMENU_OPTION,                                                             \
-  0,                                                                          \
-  display_msg                                                                 \
-}                                                                             \
+#define SUBMENU_OPTION(sub_menu, display_string, help_string, line_number, display_msg)   \
+{                                                                                         \
+  NULL,                                                                                   \
+  NULL,                                                                                   \
+  sub_menu,                                                                               \
+  display_string,                                                                         \
+  NULL,                                                                                   \
+  NULL,                                                                                   \
+  sizeof(sub_menu) / sizeof(MenuOptionType),                                              \
+  help_string,                                                                            \
+  line_number,                                                                            \
+  SUBMENU_OPTION,                                                                         \
+  0,                                                                                      \
+  display_msg                                                                             \
+}                                                                                         \
 
-#define ACTION_SUBMENU_OPTION(sub_menu, action_function, display_string, help_string, line_number, display_msg) \
-{                                                                             \
-  action_function,                                                            \
-  NULL,                                                                       \
-  sub_menu,                                                                   \
-  display_string,                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  sizeof(sub_menu) / sizeof(MenuOptionType),                                  \
-  help_string,                                                                \
-  line_number,                                                                \
-  SUBMENU_OPTION | ACTION_OPTION,                                             \
-  0,                                                                          \
-  display_msg                                                                 \
-}                                                                             \
+#define ACTION_SUBMENU_OPTION(sub_menu, action_function, display_string, help_string, line_number, display_msg)   \
+{                                                                                                                 \
+  action_function,                                                                                                \
+  NULL,                                                                                                           \
+  sub_menu,                                                                                                       \
+  display_string,                                                                                                 \
+  NULL,                                                                                                           \
+  NULL,                                                                                                           \
+  sizeof(sub_menu) / sizeof(MenuOptionType),                                                                      \
+  help_string,                                                                                                    \
+  line_number,                                                                                                    \
+  SUBMENU_OPTION | ACTION_OPTION,                                                                                 \
+  0,                                                                                                              \
+  display_msg                                                                                                     \
+}                                                                                                                 \
 
-#define SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, display_msg) \
-{                                                                             \
-  NULL,                                                                       \
-  passive_function,                                                           \
-  NULL,                                                                       \
-  display_string,                                                             \
-  options,                                                                    \
-  option_ptr,                                                                 \
-  num_options,                                                                \
-  help_string,                                                                \
-  line_number,                                                                \
-  type,                                                                       \
-  0,                                                                          \
-  display_msg                                                                 \
-}                                                                             \
+#define SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, display_msg)   \
+{                                                                                                                                           \
+  NULL,                                                                                                                                     \
+  passive_function,                                                                                                                         \
+  NULL,                                                                                                                                     \
+  display_string,                                                                                                                           \
+  options,                                                                                                                                  \
+  option_ptr,                                                                                                                               \
+  num_options,                                                                                                                              \
+  help_string,                                                                                                                              \
+  line_number,                                                                                                                              \
+  type,                                                                                                                                     \
+  0,                                                                                                                                        \
+  display_msg                                                                                                                               \
+}                                                                                                                                           \
 
-#define ACTION_SELECTION_OPTION(action_function, passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, display_msg) \
-{                                                                             \
-  action_function,                                                            \
-  passive_function,                                                           \
-  NULL,                                                                       \
-  display_string,                                                             \
-  options,                                                                    \
-  option_ptr,                                                                 \
-  num_options,                                                                \
-  help_string,                                                                \
-  line_number,                                                                \
-  type | ACTION_OPTION,                                                       \
-  0,                                                                          \
-  display_msg                                                                 \
-}                                                                             \
+#define ACTION_SELECTION_OPTION(action_function, passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, display_msg)   \
+{                                                                                                                                                                   \
+  action_function,                                                                                                                                                  \
+  passive_function,                                                                                                                                                 \
+  NULL,                                                                                                                                                             \
+  display_string,                                                                                                                                                   \
+  options,                                                                                                                                                          \
+  option_ptr,                                                                                                                                                       \
+  num_options,                                                                                                                                                      \
+  help_string,                                                                                                                                                      \
+  line_number,                                                                                                                                                      \
+  type | ACTION_OPTION,                                                                                                                                             \
+  0,                                                                                                                                                                \
+  display_msg                                                                                                                                                       \
+}                                                                                                                                                                   \
 
 
 #define STRING_SELECTION_OPTION(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, display_msg) \
@@ -1020,51 +1017,51 @@ typedef struct _MenuType MenuType;
    Tooltip macros (_TT variants).
    These are identical to the originals but add a `tooltip` MSG index.
    -------------------------------------------------------------------------- */
-#define ACTION_OPTION_TT(action_function, passive_function, display_string, help_string, line_number, tooltip) \
-{                                                                             \
-  action_function,                                                            \
-  passive_function,                                                           \
-  NULL,                                                                       \
-  display_string,                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  0,                                                                          \
-  help_string,                                                                \
-  line_number,                                                                \
-  ACTION_OPTION,                                                              \
-  tooltip                                                                 \
-}
+#define ACTION_OPTION_TT(action_function, passive_function, display_string, help_string, line_number, tooltip)    \
+{                                                                                                                 \
+  action_function,                                                                                                \
+  passive_function,                                                                                               \
+  NULL,                                                                                                           \
+  display_string,                                                                                                 \
+  NULL,                                                                                                           \
+  NULL,                                                                                                           \
+  0,                                                                                                              \
+  help_string,                                                                                                    \
+  line_number,                                                                                                    \
+  ACTION_OPTION,                                                                                                  \
+  tooltip                                                                                                         \
+}                                                                                                                 \
 
 #define SUBMENU_OPTION_TT(sub_menu, display_string, help_string, line_number, tooltip)    \
-{                                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  sub_menu,                                                                   \
-  display_string,                                                             \
-  NULL,                                                                       \
-  NULL,                                                                       \
-  sizeof(sub_menu) / sizeof(MenuOptionType),                                  \
-  help_string,                                                                \
-  line_number,                                                                \
-  SUBMENU_OPTION,                                                             \
-  tooltip                                                                 \
-}
+{                                                                                         \
+  NULL,                                                                                   \
+  NULL,                                                                                   \
+  sub_menu,                                                                               \
+  display_string,                                                                         \
+  NULL,                                                                                   \
+  NULL,                                                                                   \
+  sizeof(sub_menu) / sizeof(MenuOptionType),                                              \
+  help_string,                                                                            \
+  line_number,                                                                            \
+  SUBMENU_OPTION,                                                                         \
+  tooltip                                                                                 \
+}                                                                                         \
 
-#define SELECTION_OPTION_TT(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, tooltip, display_msg) \
-{                                                                             \
-  NULL,                                                                       \
-  passive_function,                                                           \
-  NULL,                                                                       \
-  display_string,                                                             \
-  options,                                                                    \
-  option_ptr,                                                                 \
-  num_options,                                                                \
-  help_string,                                                                \
-  line_number,                                                                \
-  type,                                                                       \
-  tooltip,                                                                    \
-  display_msg                                                                 \
-}
+#define SELECTION_OPTION_TT(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, type, tooltip, display_msg)   \
+{                                                                                                                                                       \
+  NULL,                                                                                                                                                 \
+  passive_function,                                                                                                                                     \
+  NULL,                                                                                                                                                 \
+  display_string,                                                                                                                                       \
+  options,                                                                                                                                              \
+  option_ptr,                                                                                                                                           \
+  num_options,                                                                                                                                          \
+  help_string,                                                                                                                                          \
+  line_number,                                                                                                                                          \
+  type,                                                                                                                                                 \
+  tooltip,                                                                                                                                              \
+  display_msg                                                                                                                                           \
+}                                                                                                                                                       \
 
 #define STRING_SELECTION_OPTION_TT(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, tooltip, display_msg) \
   SELECTION_OPTION_TT(passive_function, display_string, options, option_ptr, num_options, help_string, line_number, STRING_SELECTION_OPTION, tooltip, display_msg)
@@ -1102,7 +1099,6 @@ u32 savestate_slot = 0;
 void _flush_cache(void);
 
 static int sort_function(const void *dest_str_ptr, const void *src_str_ptr);
-
 
 static s32 save_game_config_file(void);
 
@@ -1204,11 +1200,11 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
     quit();
   }
 
-  #define CHECK_MEM_ALLOCATE(mem_block)                                       \
-  {                                                                           \
-    if (mem_block == NULL)                                                    \
-      malloc_error();                                                         \
-  }                                                                           \
+  #define CHECK_MEM_ALLOCATE(mem_block)   \
+  {                                       \
+    if (mem_block == NULL)                \
+      malloc_error();                     \
+  }                                       \
 
 
   if (default_dir_name != NULL)
@@ -1717,26 +1713,6 @@ static void reload_cheats_page(void)
     }
 }
 
-
-
-/* ------------------------------------------------------------------
-   Refresh all menu display strings after a language change.
-   Iterates the current menu and patches display_string from display_msg.
-   ------------------------------------------------------------------ */
-static void refresh_menu_strings(MenuType *menu)
-{
-    if (!menu || !menu->options)
-        return;
-
-    u32 i;
-    for (i = 0; i < menu->num_options; i++)
-    {
-        MenuOptionType *opt = &menu->options[i];
-        if (opt->display_msg != 0)
-            opt->display_string = MSG[opt->display_msg];
-    }
-}
-
 /* Global array of all menus — populated once inside menu(),
    then used by file-scope refresh to avoid nested functions. */
 #define MAX_MENUS 9
@@ -1813,18 +1789,18 @@ u32 menu(void)
   auto void menu_init(void);
   auto void menu_term(void);
   auto void menu_exit(void);
-  auto void menu_quit(void);
+//  auto void menu_quit(void);
   auto void menu_reset(void);
   auto void menu_suspend(void);
 
-  auto void menu_screen_capture(void);
+//  auto void menu_screen_capture(void);
 
   auto void menu_change_state(void);
   auto u32 menu_save_state(void);
   auto u32 menu_load_state(void);
   auto void menu_load_state_file(void);
 
-  auto void menu_default(void);
+//  auto void menu_default(void);
   auto void menu_load_cheat_file(void);
   auto void submenu_cheats_misc(void);
 
@@ -1876,11 +1852,11 @@ u32 menu(void)
       repeat = 0;
   }
 
-  void menu_quit(void)
+/*   void menu_quit(void)
   {
     menu_term();
     quit();
-  }
+  } */
 
   void menu_suspend(void)
   {
@@ -1944,7 +1920,7 @@ u32 menu(void)
     }
   }
 
-  void menu_screen_capture(void)
+/*   void menu_screen_capture(void)
   {
     if (!first_load)
     {
@@ -1965,7 +1941,7 @@ u32 menu(void)
       set_cpu_clock(PSP_CLOCK_222);
       scePowerUnlock(0);
     }
-  }
+  } */
 
   void menu_change_state(void)
   {
@@ -2019,7 +1995,7 @@ u32 menu(void)
     }
   }
 
-  void menu_default(void)
+  /* void menu_default(void)
   {
 	option_screen_scale = SCALED_X15_GU;
 	option_screen_mag = 170;
@@ -2056,7 +2032,7 @@ u32 menu(void)
 
     flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
     ram_dynarec_policy_menu_prev = ~(u32)0;
-  }
+  } */
 
   void menu_graphics_default(void)
   {
@@ -2106,7 +2082,7 @@ u32 menu(void)
     gamepad_config_map[12] = BUTTON_ID_UP;       /* Analog Up */
     gamepad_config_map[13] = BUTTON_ID_DOWN;     /* Analog Down */
     gamepad_config_map[14] = BUTTON_ID_LEFT;     /* Analog Left */
-    gamepad_config_map[15] = BUTTON_ID_RIGHT;     /* Analog Right */
+    gamepad_config_map[15] = BUTTON_ID_RIGHT;    /* Analog Right */
   }
   
   void menu_theme_settings_default(void)
@@ -2115,7 +2091,6 @@ u32 menu(void)
     option_screen_capture_format = 0;
     option_sound_volume = 10;
     option_update_backup = 1;
-    // flush_translation_cache(TRANSLATION_REGION_WRITABLE, FLUSH_REASON_INITIALIZING);
   }
 
   void menu_load_cheat_file(void)
@@ -2155,38 +2130,37 @@ u32 menu(void)
     }
   }
 
-  #define DRAW_TITLE(title)                                                   \
-   sprintf(line_buffer, "%s %s", FONT_GBA_ICON, MSG[title]);                  \
-   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
+  #define DRAW_TITLE(title)                                         \
+   sprintf(line_buffer, "%s %s", FONT_GBA_ICON, MSG[title]);        \
+   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);    \
 
-  #define DRAW_TITLE_PSP(title)                                                   \
-   sprintf(line_buffer, "%s %s", FONT_PSP_ICON, MSG[title]);                  \
-   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
+  #define DRAW_TITLE_PSP(title)                                     \
+   sprintf(line_buffer, "%s %s", FONT_PSP_ICON, MSG[title]);        \
+   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);    \
 
-  #define DRAW_TITLE_SAVESTATE(title)                                                   \
-   sprintf(line_buffer, "%s %s", FONT_MSC_ICON, MSG[title]);                  \
-   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
+  #define DRAW_TITLE_SAVESTATE(title)                               \
+   sprintf(line_buffer, "%s %s", FONT_MSC_ICON, MSG[title]);        \
+   print_string(line_buffer, 6, 2, color_help_text, BG_NO_FILL);    \
 
+  #define DRAW_TITLE_GBK(title)                                         \
+   sprintf(line_buffer, "%s %s", FONT_GBA_ICON_GBK, MSG[title]);        \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);    \
 
-  #define DRAW_TITLE_GBK(title)                                                   \
-   sprintf(line_buffer, "%s %s", FONT_GBA_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
+  #define DRAW_TITLE_PSP_GBK(title)                                     \
+   sprintf(line_buffer, "%s %s", FONT_PSP_ICON_GBK, MSG[title]);        \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);    \
 
-  #define DRAW_TITLE_PSP_GBK(title)                                                   \
-   sprintf(line_buffer, "%s %s", FONT_PSP_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
+  #define DRAW_TITLE_SAVESTATE_GBK(title)                               \
+   sprintf(line_buffer, "%s %s", FONT_MSC_ICON_GBK, MSG[title]);        \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);    \
 
-  #define DRAW_TITLE_SAVESTATE_GBK(title)                                                   \
-   sprintf(line_buffer, "%s %s", FONT_MSC_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
+  #define DRAW_TITLE_OPT_GBK(title)                                     \
+   sprintf(line_buffer, "%s %s", FONT_OPT_ICON_GBK, MSG[title]);        \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);    \
 
-  #define DRAW_TITLE_OPT_GBK(title)                                                   \
-   sprintf(line_buffer, "%s %s", FONT_OPT_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
-
-  #define DRAW_TITLE_PAD_GBK(title)                                                   \
-   sprintf(line_buffer, "%s %s", FONT_PAD_ICON_GBK, MSG[title]);                  \
-   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);              \
+  #define DRAW_TITLE_PAD_GBK(title)                                     \
+   sprintf(line_buffer, "%s %s", FONT_PAD_ICON_GBK, MSG[title]);        \
+   print_string_gbk(line_buffer, 6, 2, color_help_text, BG_NO_FILL);    \
 
   void submenu_emulator(void)
   {
@@ -2455,7 +2429,6 @@ u32 menu(void)
      Theme submenu
    ------------------------------------------------------------------ */
 
-
   void submenu_theme(void)
   {
     DRAW_TITLE_OPT_GBK(MSG_EMULATOR_MENU_TITLE);
@@ -2477,10 +2450,6 @@ u32 menu(void)
     apply_theme(option_theme);
   }
 
-
-
-
-
   MenuOptionType custom_colors_options[] =
   {
     ACTION_OPTION(menu_pick_color, NULL, MSG[MSG_CUSTOM_COLOR_BG],            MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 0, MSG_CUSTOM_COLOR_BG),
@@ -2500,27 +2469,20 @@ u32 menu(void)
 
   MAKE_MENU(custom_colors, NULL, NULL);
 
-
   MenuOptionType theme_options[] =
   {
     STRING_SELECTION_OPTION(menu_passive_theme, MSG[MSG_OPTION_MENU_THEMES], theme_preset_options, &option_theme, 9, MSG_OPTION_MENU_HELP_THEMES, 0, MSG_OPTION_MENU_THEMES),
-
     SUBMENU_OPTION(&custom_colors_menu, MSG[MSG_OPTION_MENU_CUSTOM_COLORS], MSG_OPTION_MENU_HELP_CUSTOM_COLORS, 1, MSG_OPTION_MENU_CUSTOM_COLORS),
 
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_SWAP_BUTTONS], swap_button_options, &option_swap_confirm_buttons, 2, MSG_OPTION_MENU_HELP_SWAP_BUTTONS, 3, MSG_OPTION_MENU_SWAP_BUTTONS),
-
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_6], sound_volume_options, &option_sound_volume, 11, MSG_OPTION_MENU_HELP_6, 4, MSG_OPTION_MENU_6),
-
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_SHOW_FPS], on_off_options, &psp_fps_debug, 2, MSG_OPTION_MENU_HELP_SHOW_FPS, 5, MSG_OPTION_MENU_SHOW_FPS),
-
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_SCREENSHOT], image_format_options, &option_screen_capture_format, 2, MSG_OPTION_MENU_HELP_7, 6, MSG_OPTION_MENU_SCREENSHOT),
-    
     STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_9], update_backup_options, &option_update_backup, 2, MSG_OPTION_MENU_HELP_9, 7, MSG_TOOLTIP_AUTO_BACKUP, MSG_OPTION_MENU_9), 
-    
+
     STRING_SELECTION_ACTION_OPTION(NULL, menu_refresh_language, MSG[MSG_OPTION_MENU_10], language_option, &option_language, 5, MSG_OPTION_MENU_HELP_10, 9, MSG_OPTION_MENU_10), 
 
     ACTION_OPTION(menu_theme_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT_THEME], MSG_OPTION_MENU_HELP_DEFAULT_THEME, 11, MSG_OPTION_MENU_DEFAULT_THEME),
-
     ACTION_OPTION(menu_theme_settings_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT_SETTINGS], MSG_OPTION_MENU_HELP_DEFAULT, 12, MSG_OPTION_MENU_DEFAULT_SETTINGS),
 
     ACTION_SUBMENU_OPTION(NULL, NULL, MSG[MSG_OPTION_MENU_11], MSG_OPTION_MENU_HELP_11, 14, MSG_OPTION_MENU_11)
@@ -2531,15 +2493,11 @@ u32 menu(void)
   MenuOptionType graphics_options[] =
   {
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_0], scale_options, &option_screen_scale, 5, MSG_OPTION_MENU_HELP_0, 0, MSG_OPTION_MENU_0),
-
     NUMERIC_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_1], &option_screen_mag, 201, MSG_OPTION_MENU_HELP_1, 1,MSG_TOOLTIP_MAGNIFICATION, MSG_OPTION_MENU_1),
-
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_2], on_off_options, &option_screen_filter, 2, MSG_OPTION_MENU_HELP_2, 2, MSG_OPTION_MENU_2),
 
     STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_VIDEORENDER], video_renderer_options, &option_video_renderer, 2, MSG_OPTION_MENU_HELP_7, 4, MSG_TOOLTIP_VIDEO_RENDERER, MSG_OPTION_MENU_VIDEORENDER),
-
     STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_OAMHIJACKSUPPORT], on_off_options, &option_oam_hijacking_enabled, 2, MSG_OPTION_MENU_HELP_7, 5, MSG_TOOLTIP_OAM_HIJACKING, MSG_OPTION_MENU_OAMHIJACKSUPPORT),
-
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_VSYNCPSP], on_off_options, &option_psp_vsync, 2, MSG_OPTION_MENU_HELP_7, 6,MSG_OPTION_MENU_VSYNCPSP),
     
     ACTION_OPTION(menu_graphics_default, NULL, MSG[MSG_OPTION_MENU_DEFAULT], MSG_OPTION_MENU_HELP_DEFAULT, 8, MSG_OPTION_MENU_DEFAULT),
@@ -2552,15 +2510,11 @@ u32 menu(void)
   MenuOptionType emulator_options[] =
   {
     STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_3], frameskip_options, &option_frameskip_type, 3, MSG_OPTION_MENU_HELP_3, 0, MSG_TOOLTIP_FRAMESKIP_TYPE, MSG_OPTION_MENU_3),
-
     NUMERIC_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_4], &option_frameskip_value, 10, MSG_OPTION_MENU_HELP_4, 1, MSG_TOOLTIP_FRAMESKIP_VALUE, MSG_OPTION_MENU_4),
-
     STRING_SELECTION_OPTION(NULL, MSG[MSG_OPTION_MENU_5], clock_speed_options, &option_clock_speed, 4, MSG_OPTION_MENU_HELP_5, 2, MSG_OPTION_MENU_5), 
 
     STRING_SELECTION_OPTION_TT(menu_passive_ram_dynarec_policy, MSG[MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE], ram_dynarec_options, &option_ram_dynarec_policy, 3, MSG_OPTION_MENU_HELP_BLOCK_CHECKSUM_REUSE, 4, MSG_TOOLTIP_RAM_DYNAREC_MODE, MSG_OPTION_MENU_BLOCK_CHECKSUM_REUSE),
-
     NUMERIC_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_WIN_START], &option_hblank_irq_window_start, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_START, 5, MSG_TOOLTIP_HBLANK_WIN_START, MSG_OPTION_MENU_HBLANK_IRQ_WIN_START),
-
     NUMERIC_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_HBLANK_IRQ_WIN_END], &option_hblank_irq_window_end, 228, MSG_OPTION_MENU_HELP_HBLANK_IRQ_WIN_END, 6, MSG_TOOLTIP_HBLANK_WIN_END, MSG_OPTION_MENU_HBLANK_IRQ_WIN_END),
 
     STRING_SELECTION_OPTION_TT(NULL, MSG[MSG_OPTION_MENU_7], stack_optimize_options, &option_stack_optimize, 2, MSG_OPTION_MENU_HELP_7, 8, MSG_TOOLTIP_STACK_OPTIMIZE, MSG_OPTION_MENU_7),
@@ -2589,6 +2543,7 @@ u32 menu(void)
     CHEAT_OPTION((10 * menu_cheat_page) + 9),
 
     NUMERIC_SELECTION_OPTION(reload_cheats_page, MSG[MSG_CHEAT_MENU_3], &menu_cheat_page, MAX_CHEATS_PAGE, MSG_CHEAT_MENU_HELP_3, 11, MSG_CHEAT_MENU_3),
+
     ACTION_OPTION(NULL, NULL, MSG[MSG_CHEAT_MENU_1], MSG_CHEAT_MENU_HELP_1, 13, MSG_CHEAT_MENU_1),
 
     SUBMENU_OPTION(NULL, MSG[MSG_CHEAT_MENU_2], MSG_CHEAT_MENU_HELP_2, 15, MSG_CHEAT_MENU_2)
@@ -2660,29 +2615,19 @@ u32 menu(void)
   MenuOptionType main_options[] =
   {
     NUMERIC_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_0], &savestate_slot, 10, MSG_MAIN_MENU_HELP_0, 0, MSG_MAIN_MENU_0),
-
     NUMERIC_SELECTION_ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_1], &savestate_slot, 10, MSG_MAIN_MENU_HELP_1, 1, MSG_MAIN_MENU_1),
-
     ACTION_SUBMENU_OPTION(&savestate_menu, NULL, MSG[MSG_MAIN_MENU_2], MSG_MAIN_MENU_HELP_2, 2, MSG_MAIN_MENU_2),
 
     SUBMENU_OPTION(&graphics_menu, MSG[MSG_MAIN_MENU_3], MSG_MAIN_MENU_HELP_3, 4, MSG_MAIN_MENU_3),
-
     SUBMENU_OPTION(&emulator_menu, MSG[MSG_MAIN_MENU_4], MSG_MAIN_MENU_HELP_4, 5, MSG_MAIN_MENU_4), 
-
     SUBMENU_OPTION(&gamepad_config_menu, MSG[MSG_MAIN_MENU_5], MSG_MAIN_MENU_HELP_5, 6, MSG_MAIN_MENU_5),
-
     SUBMENU_OPTION(&analog_config_menu, MSG[MSG_MAIN_MENU_6], MSG_MAIN_MENU_HELP_6, 7, MSG_MAIN_MENU_6),
-    
     SUBMENU_OPTION(&theme_menu, MSG[MSG_MAIN_MENU_EMULATOR], MSG_MAIN_MENU_HELP_EMULATOR, 8, MSG_MAIN_MENU_EMULATOR),
-
     ACTION_OPTION(menu_show_game_txt_debug, NULL, MSG[MSG_MAIN_MENU_GAMECONFIG], MSG_MAIN_MENU_HELP_GAMECONFIG, 9, MSG_MAIN_MENU_GAMECONFIG),
-
     SUBMENU_OPTION(&cheats_misc_menu, MSG[MSG_MAIN_MENU_CHEAT], MSG_MAIN_MENU_HELP_CHEAT, 10, MSG_MAIN_MENU_CHEAT),
 
     ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_7], MSG_MAIN_MENU_HELP_7, 12, MSG_MAIN_MENU_7),
-
     ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_8], MSG_MAIN_MENU_HELP_8, 13, MSG_MAIN_MENU_8),
-
     ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_9], MSG_MAIN_MENU_HELP_9, 14, MSG_MAIN_MENU_9),
 
     ACTION_OPTION(NULL, NULL, MSG[MSG_MAIN_MENU_10], MSG_MAIN_MENU_HELP_10, 17, MSG_MAIN_MENU_10),
@@ -2692,6 +2637,7 @@ u32 menu(void)
 
 
   MAKE_MENU(main, NULL, NULL);
+
   /* Populate global menu array for language refresh */
   all_menus[0] = &main_menu;
   all_menus[1] = &graphics_menu;
@@ -2703,7 +2649,6 @@ u32 menu(void)
   all_menus[7] = &savestate_menu;
   all_menus[8] = &cheats_misc_menu;
   num_all_menus = MAX_MENUS;
-
 
 
   void choose_menu(MenuType *new_menu)
@@ -2720,6 +2665,7 @@ u32 menu(void)
     //sceImposeSetHomePopup((current_menu == &main_menu) ? 1 : 0);
     sceImposeSetHomePopup(1); // enable in all menus but not game
   }
+
 
   sound_pause = 1;
 
@@ -3032,7 +2978,7 @@ u32 menu(void)
                   case 17: // Sleep Mode
                     menu_suspend();
                     break;
-                  case 18: // Exit ReTempGBA
+                  case 18: // Exit TempGBA
                     quit();
                     break;
                   default:
@@ -3306,7 +3252,6 @@ static void get_timestamp_string(char *buffer, u16 msg_id, ScePspDateTime *msg_t
   Save Config Files
 -----------------------------------------------------------------------------*/
 
-
 static s32 save_game_config_file(void)
 {
   SceUID game_config_file;
@@ -3332,9 +3277,9 @@ static s32 save_game_config_file(void)
     file_options[0]  = option_screen_scale;
     file_options[1]  = option_screen_mag;
     file_options[2]  = option_screen_filter;
-    file_options[3] = option_frameskip_type;
-    file_options[4] = option_frameskip_value;
-    file_options[5] = option_clock_speed;
+    file_options[3]  = option_frameskip_type;
+    file_options[4]  = option_frameskip_value;
+    file_options[5]  = option_clock_speed;
     file_options[6]  = option_sound_volume;
 
     for (i = 0; i < 16; i++)
@@ -3373,17 +3318,17 @@ s32 save_config_file(void)
     u32 i;
     u32 file_options[GPSP_CONFIG_NUM];
 
-    file_options[0]  = option_screen_scale;
-    file_options[1]  = option_screen_mag;
-    file_options[2]  = option_screen_filter;
-    file_options[3] = psp_fps_debug;
-    file_options[4] = option_frameskip_type;
-    file_options[5] = option_frameskip_value;
-    file_options[6] = option_clock_speed;
-    file_options[7]  = option_sound_volume;
-    file_options[8]  = option_stack_optimize;
+    file_options[0]   = option_screen_scale;
+    file_options[1]   = option_screen_mag;
+    file_options[2]   = option_screen_filter;
+    file_options[3]   = psp_fps_debug;
+    file_options[4]   = option_frameskip_type;
+    file_options[5]   = option_frameskip_value;
+    file_options[6]   = option_clock_speed;
+    file_options[7]   = option_sound_volume;
+    file_options[8]   = option_stack_optimize;
     /* Store mode with +4 marker so old 0/1 boolean configs can be migrated. */
-    file_options[9]  = option_ram_dynarec_policy + 4;
+    file_options[9]   = option_ram_dynarec_policy + 4;
     file_options[10]  = option_video_renderer;
     file_options[11]  = option_oam_hijacking_enabled;
     file_options[12]  = option_boot_mode;
@@ -3391,18 +3336,18 @@ s32 save_config_file(void)
     file_options[14]  = option_screen_capture_format;
     file_options[15]  = option_enable_analog;
     file_options[16]  = option_analog_sensitivity;
-    file_options[17] = option_language;
-    file_options[18] = option_hblank_irq_window_start % 228;
-    file_options[19] = option_hblank_irq_window_end % 228;
-    file_options[20] = option_psp_vsync % 2;
-    file_options[20] = option_theme % 9;
+    file_options[17]  = option_language;
+    file_options[18]  = option_hblank_irq_window_start % 228;
+    file_options[19]  = option_hblank_irq_window_end % 228;
+    file_options[20]  = option_psp_vsync % 2;
+    file_options[21]  = option_swap_confirm_buttons;
+    file_options[22]  = option_theme % 9;
+    
 
     for (i = 0; i < 16; i++)
     {
-      file_options[22 + i] = gamepad_config_map[i];
+      file_options[23 + i] = gamepad_config_map[i];
     }
-
-    file_options[37] = option_swap_confirm_buttons;
 
     FILE_WRITE_ARRAY(config_file, file_options);
     FILE_CLOSE(config_file);
@@ -3444,13 +3389,13 @@ s32 load_game_config_file(void)
 
       FILE_READ_ARRAY(game_config_file, file_options);
 
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      option_frameskip_type  = file_options[3] % 3;
-      option_frameskip_value = file_options[4];
-      option_clock_speed     = file_options[5] % 4;
-      option_sound_volume   = file_options[6] % 11;
+      option_screen_scale     = file_options[0] % 5;
+      option_screen_mag       = file_options[1] % 201;
+      option_screen_filter    = file_options[2] % 2;
+      option_frameskip_type   = file_options[3] % 3;
+      option_frameskip_value  = file_options[4];
+      option_clock_speed      = file_options[5] % 4;
+      option_sound_volume     = file_options[6] % 11;
 
       for (i = 0; i < 16; i++)
       {
@@ -3460,7 +3405,7 @@ s32 load_game_config_file(void)
           menu_button = i;
       }
 
-      // hardcode triangle to main menu when home button is not available
+      // hardcode triangle to main menu when home button is not enabled
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -3480,9 +3425,9 @@ s32 load_game_config_file(void)
     }
   }
 
-  option_frameskip_type = FRAMESKIP_AUTO;
-  option_frameskip_value = 9;
-  option_clock_speed = PSP_CLOCK_333;
+  option_frameskip_type   = FRAMESKIP_AUTO;
+  option_frameskip_value  = 9;
+  option_clock_speed      = PSP_CLOCK_333;
 
   return -1;
 }
@@ -3491,13 +3436,13 @@ static void load_hblank_irq_window_from_cap(u32 cap)
 {
   if (cap == 0)
   {
-    option_hblank_irq_window_start = 0;
-    option_hblank_irq_window_end = 0;
+    option_hblank_irq_window_start  = 0;
+    option_hblank_irq_window_end    = 0;
   }
   else
   {
-    option_hblank_irq_window_start = 1;
-    option_hblank_irq_window_end = cap % 228;
+    option_hblank_irq_window_start  = 1;
+    option_hblank_irq_window_end    = cap % 228;
   }
 }
 
@@ -3522,15 +3467,15 @@ s32 load_config_file(void)
 
       FILE_READ_ARRAY(config_file, file_options);
 
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      psp_fps_debug       = file_options[3] % 2;
-      option_frameskip_type  = file_options[4] % 3;
-      option_frameskip_value = file_options[5];
-      option_clock_speed     = file_options[6] % 4;
-      option_sound_volume   = file_options[7] % 11;
-      option_stack_optimize = file_options[8] % 2;
+      option_screen_scale     = file_options[0] % 5;
+      option_screen_mag       = file_options[1] % 201;
+      option_screen_filter    = file_options[2] % 2;
+      psp_fps_debug           = file_options[3] % 2;
+      option_frameskip_type   = file_options[4] % 3;
+      option_frameskip_value  = file_options[5];
+      option_clock_speed      = file_options[6] % 4;
+      option_sound_volume     = file_options[7] % 11;
+      option_stack_optimize   = file_options[8] % 2;
       {
         u32 stored_ram_dynarec_policy = file_options[9];
         if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
@@ -3548,31 +3493,30 @@ s32 load_config_file(void)
           option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
         }
       }
-      option_video_renderer = file_options[10] % 2;
-      option_oam_hijacking_enabled = file_options[11] % 2;
-      option_boot_mode      = file_options[12] % 2;
-      option_update_backup  = file_options[13] % 2;
-      option_screen_capture_format = file_options[14] % 2;
-      option_enable_analog  = file_options[15] % 2;
-      option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 5;
-      option_hblank_irq_window_start = file_options[18] % 228;
-      option_hblank_irq_window_end = file_options[19] % 228;
-      option_psp_vsync = file_options[20] % 2;
-      option_theme = file_options[20] % 9;
+      option_video_renderer           = file_options[10] % 2;
+      option_oam_hijacking_enabled    = file_options[11] % 2;
+      option_boot_mode                = file_options[12] % 2;
+      option_update_backup            = file_options[13] % 2;
+      option_screen_capture_format    = file_options[14] % 2;
+      option_enable_analog            = file_options[15] % 2;
+      option_analog_sensitivity       = file_options[16] % 10;
+      option_language                 = file_options[17] % 5;
+      option_hblank_irq_window_start  = file_options[18] % 228;
+      option_hblank_irq_window_end    = file_options[19] % 228;
+      option_psp_vsync                = file_options[20] % 2;
+      option_swap_confirm_buttons     = file_options[21] % 2;
+      option_theme                    = file_options[22] % 9;
       apply_theme(option_theme);
 
       for (i = 0; i < 16; i++)
       {
-        gamepad_config_map[i] = file_options[21 + i] % (BUTTON_ID_NONE + 1);
+        gamepad_config_map[i] = file_options[23 + i] % (BUTTON_ID_NONE + 1);
 
         if (gamepad_config_map[i] == BUTTON_ID_MENU)
           menu_button = i;
       }
 
-      option_swap_confirm_buttons = file_options[37] % 2;
-
-      // hardcode triangle to main menu when home button is not available
+      // hardcode triangle to main menu when home button is not enabled
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -3586,15 +3530,15 @@ s32 load_config_file(void)
 
       FILE_READ_ARRAY(config_file, file_options);
 
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      psp_fps_debug       = file_options[3] % 2;
-      option_frameskip_type  = file_options[4] % 3;
-      option_frameskip_value = file_options[5];
-      option_clock_speed     = file_options[6] % 4;
-      option_sound_volume   = file_options[7] % 11;
-      option_stack_optimize = file_options[8] % 2;
+      option_screen_scale     = file_options[0] % 5;
+      option_screen_mag       = file_options[1] % 201;
+      option_screen_filter    = file_options[2] % 2;
+      psp_fps_debug           = file_options[3] % 2;
+      option_frameskip_type   = file_options[4] % 3;
+      option_frameskip_value  = file_options[5];
+      option_clock_speed      = file_options[6] % 4;
+      option_sound_volume     = file_options[7] % 11;
+      option_stack_optimize   = file_options[8] % 2;
       {
         u32 stored_ram_dynarec_policy = file_options[9];
         if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
@@ -3612,81 +3556,20 @@ s32 load_config_file(void)
           option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
         }
       }
-      option_video_renderer = file_options[10] % 2;
-      option_oam_hijacking_enabled = file_options[11] % 2;
-      option_boot_mode      = file_options[12] % 2;
-      option_update_backup  = file_options[13] % 2;
-      option_screen_capture_format = file_options[14] % 2;
-      option_enable_analog  = file_options[15] % 2;
-      option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 5;
-      option_hblank_irq_window_start = file_options[18] % 228;
-      option_hblank_irq_window_end = file_options[19] % 228;
-      option_theme = file_options[20] % 9;
+      option_video_renderer           = file_options[10] % 2;
+      option_oam_hijacking_enabled    = file_options[11] % 2;
+      option_boot_mode                = file_options[12] % 2;
+      option_update_backup            = file_options[13] % 2;
+      option_screen_capture_format    = file_options[14] % 2;
+      option_enable_analog            = file_options[15] % 2;
+      option_analog_sensitivity       = file_options[16] % 10;
+      option_language                 = file_options[17] % 5;
+      option_hblank_irq_window_start  = file_options[18] % 228;
+      option_hblank_irq_window_end    = file_options[19] % 228;
+      option_psp_vsync                = 0;
+      option_swap_confirm_buttons     = 0;
+      option_theme                    = 0;
       apply_theme(option_theme);
-
-      for (i = 0; i < 16; i++)
-      {
-        gamepad_config_map[i] = file_options[21 + i] % (BUTTON_ID_NONE + 1);
-
-        if (gamepad_config_map[i] == BUTTON_ID_MENU)
-          menu_button = i;
-      }
-
-      if ((enable_home_menu == 0) && (menu_button == -1))
-        gamepad_config_map[0] = BUTTON_ID_MENU;
-
-      option_swap_confirm_buttons = 0;
-
-      FILE_CLOSE(config_file);
-    }
-    else if (file_size == (GPSP_CONFIG_NUM_PRE_THEME * 4))
-    {
-      u32 i;
-      u32 file_options[file_size / 4];
-      s32 menu_button = -1;
-
-      FILE_READ_ARRAY(config_file, file_options);
-
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      psp_fps_debug       = file_options[3] % 2;
-      option_frameskip_type  = file_options[4] % 3;
-      option_frameskip_value = file_options[5];
-      option_clock_speed     = file_options[6] % 4;
-      option_sound_volume   = file_options[7] % 11;
-      option_stack_optimize = file_options[8] % 2;
-      {
-        u32 stored_ram_dynarec_policy = file_options[9];
-        if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
-        {
-          option_ram_dynarec_policy = stored_ram_dynarec_policy - 4;
-        }
-        else if (stored_ram_dynarec_policy <= 1)
-        {
-          /* Migration path from old bool option:
-           * OFF(0)->Partial no reuse, ON(1)->Partial with reuse. */
-          option_ram_dynarec_policy = stored_ram_dynarec_policy + 1;
-        }
-        else
-        {
-          option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
-        }
-      }
-      option_video_renderer = file_options[10] % 2;
-      option_oam_hijacking_enabled = file_options[11] % 2;
-      option_boot_mode      = file_options[12] % 2;
-      option_update_backup  = file_options[13] % 2;
-      option_screen_capture_format = file_options[14] % 2;
-      option_enable_analog  = file_options[15] % 2;
-      option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 5;
-      option_hblank_irq_window_start = file_options[18] % 228;
-      option_hblank_irq_window_end = file_options[19] % 228;
-      option_psp_vsync = 0;
-      option_theme = 0;
-      apply_theme(0);
 
       for (i = 0; i < 16; i++)
       {
@@ -3696,7 +3579,6 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
-      // hardcode triangle to main menu when home button is not available
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -3710,15 +3592,15 @@ s32 load_config_file(void)
 
       FILE_READ_ARRAY(config_file, file_options);
 
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      psp_fps_debug       = file_options[3] % 2;
-      option_frameskip_type  = file_options[4] % 3;
-      option_frameskip_value = file_options[5];
-      option_clock_speed     = file_options[6] % 4;
-      option_sound_volume   = file_options[7] % 11;
-      option_stack_optimize = file_options[8] % 2;
+      option_screen_scale     = file_options[0] % 5;
+      option_screen_mag       = file_options[1] % 201;
+      option_screen_filter    = file_options[2] % 2;
+      psp_fps_debug           = file_options[3] % 2;
+      option_frameskip_type   = file_options[4] % 3;
+      option_frameskip_value  = file_options[5];
+      option_clock_speed      = file_options[6] % 4;
+      option_sound_volume     = file_options[7] % 11;
+      option_stack_optimize   = file_options[8] % 2;
       {
         u32 stored_ram_dynarec_policy = file_options[9];
         if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
@@ -3734,14 +3616,14 @@ s32 load_config_file(void)
           option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
         }
       }
-      option_video_renderer = file_options[10] % 2;
-      option_oam_hijacking_enabled = file_options[11] % 2;
-      option_boot_mode      = file_options[12] % 2;
-      option_update_backup  = file_options[13] % 2;
-      option_screen_capture_format = file_options[14] % 2;
-      option_enable_analog  = file_options[15] % 2;
-      option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 5;
+      option_video_renderer         = file_options[10] % 2;
+      option_oam_hijacking_enabled  = file_options[11] % 2;
+      option_boot_mode              = file_options[12] % 2;
+      option_update_backup          = file_options[13] % 2;
+      option_screen_capture_format  = file_options[14] % 2;
+      option_enable_analog          = file_options[15] % 2;
+      option_analog_sensitivity     = file_options[16] % 10;
+      option_language               = file_options[17] % 5;
       load_hblank_irq_window_from_cap(file_options[18] % 228);
 
       for (i = 0; i < 16; i++)
@@ -3752,7 +3634,7 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
-      // hardcode triangle to main menu when home button is not available
+      // hardcode triangle to main menu when home button is not enabled
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -3766,15 +3648,15 @@ s32 load_config_file(void)
 
       FILE_READ_ARRAY(config_file, file_options);
 
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      psp_fps_debug       = file_options[3] % 2;
-      option_frameskip_type  = file_options[4] % 3;
-      option_frameskip_value = file_options[5];
-      option_clock_speed     = file_options[6] % 4;
-      option_sound_volume   = file_options[7] % 11;
-      option_stack_optimize = file_options[8] % 2;
+      option_screen_scale     = file_options[0] % 5;
+      option_screen_mag       = file_options[1] % 201;
+      option_screen_filter    = file_options[2] % 2;
+      psp_fps_debug           = file_options[3] % 2;
+      option_frameskip_type   = file_options[4] % 3;
+      option_frameskip_value  = file_options[5];
+      option_clock_speed      = file_options[6] % 4;
+      option_sound_volume     = file_options[7] % 11;
+      option_stack_optimize   = file_options[8] % 2;
       {
         u32 stored_ram_dynarec_policy = file_options[9];
         if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
@@ -3790,18 +3672,16 @@ s32 load_config_file(void)
           option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
         }
       }
-      option_video_renderer = file_options[10] % 2;
-      option_oam_hijacking_enabled = file_options[11] % 2;
-      option_boot_mode      = file_options[12] % 2;
-      option_update_backup  = file_options[13] % 2;
-      option_screen_capture_format = file_options[14] % 2;
-      option_enable_analog  = file_options[15] % 2;
-      option_analog_sensitivity = file_options[16] % 10;
-      option_language       = file_options[17] % 5;
-      option_hblank_irq_window_start = 1;
-      option_hblank_irq_window_end = 160;
-      option_theme = 0;
-      apply_theme(0);
+      option_video_renderer           = file_options[10] % 2;
+      option_oam_hijacking_enabled    = file_options[11] % 2;
+      option_boot_mode                = file_options[12] % 2;
+      option_update_backup            = file_options[13] % 2;
+      option_screen_capture_format    = file_options[14] % 2;
+      option_enable_analog            = file_options[15] % 2;
+      option_analog_sensitivity       = file_options[16] % 10;
+      option_language                 = file_options[17] % 5;
+      option_hblank_irq_window_start  = 1;
+      option_hblank_irq_window_end    = 160;
 
       for (i = 0; i < 16; i++)
       {
@@ -3811,7 +3691,7 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
-      // hardcode triangle to main menu when home button is not available
+      // hardcode triangle to main menu when home button is not enabled
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
@@ -3825,15 +3705,15 @@ s32 load_config_file(void)
 
       FILE_READ_ARRAY(config_file, file_options);
 
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      psp_fps_debug       = file_options[3] % 2;
-      option_frameskip_type  = file_options[4] % 3;
-      option_frameskip_value = file_options[5];
-      option_clock_speed     = file_options[6] % 4;
-      option_sound_volume   = file_options[7] % 11;
-      option_stack_optimize = file_options[8] % 2;
+      option_screen_scale     = file_options[0] % 5;
+      option_screen_mag       = file_options[1] % 201;
+      option_screen_filter    = file_options[2] % 2;
+      psp_fps_debug           = file_options[3] % 2;
+      option_frameskip_type   = file_options[4] % 3;
+      option_frameskip_value  = file_options[5];
+      option_clock_speed      = file_options[6] % 4;
+      option_sound_volume     = file_options[7] % 11;
+      option_stack_optimize   = file_options[8] % 2;
       {
         u32 stored_ram_dynarec_policy = file_options[9];
         if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
@@ -3843,14 +3723,14 @@ s32 load_config_file(void)
         else
           option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
       }
-      option_video_renderer = VIDEO_RENDERER_NEW;
-      option_oam_hijacking_enabled = file_options[10] % 2;
-      option_boot_mode      = file_options[11] % 2;
-      option_update_backup  = file_options[12] % 2;
-      option_screen_capture_format = file_options[13] % 2;
-      option_enable_analog  = file_options[14] % 2;
-      option_analog_sensitivity = file_options[15] % 10;
-      option_language       = file_options[16] % 5;
+      option_video_renderer         = VIDEO_RENDERER_NEW;
+      option_oam_hijacking_enabled  = file_options[10] % 2;
+      option_boot_mode              = file_options[11] % 2;
+      option_update_backup          = file_options[12] % 2;
+      option_screen_capture_format  = file_options[13] % 2;
+      option_enable_analog          = file_options[14] % 2;
+      option_analog_sensitivity     = file_options[15] % 10;
+      option_language               = file_options[16] % 5;
 
       for (i = 0; i < 16; i++)
       {
@@ -3860,14 +3740,12 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
-      // hardcode triangle to main menu when home button is not available
+      // hardcode triangle to main menu when home button is not enabled
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
       option_hblank_irq_window_start = 1;
-      option_hblank_irq_window_end = 160;
-      option_theme = 0;
-      apply_theme(0);
+      option_hblank_irq_window_end   = 160;
 
       FILE_CLOSE(config_file);
     }
@@ -3879,24 +3757,24 @@ s32 load_config_file(void)
 
       FILE_READ_ARRAY(config_file, file_options);
 
-      option_screen_scale   = file_options[0] % 5;
-      option_screen_mag     = file_options[1] % 201;
-      option_screen_filter  = file_options[2] % 2;
-      psp_fps_debug       = file_options[3] % 2;
-      option_frameskip_type  = file_options[4] % 3;
-      option_frameskip_value = file_options[5];
-      option_clock_speed     = file_options[6] % 4;
-      option_sound_volume   = file_options[7] % 11;
-      option_stack_optimize = file_options[8] % 2;
-      option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
-      option_video_renderer = VIDEO_RENDERER_NEW;
-      option_oam_hijacking_enabled = 0;
-      option_boot_mode      = file_options[9] % 2;
-      option_update_backup  = file_options[10] % 2;
-      option_screen_capture_format = file_options[11] % 2;
-      option_enable_analog  = file_options[12] % 2;
-      option_analog_sensitivity = file_options[13] % 10;
-      option_language       = file_options[14] % 5;
+      option_screen_scale           = file_options[0] % 5;
+      option_screen_mag             = file_options[1] % 201;
+      option_screen_filter          = file_options[2] % 2;
+      psp_fps_debug                 = file_options[3] % 2;
+      option_frameskip_type         = file_options[4] % 3;
+      option_frameskip_value        = file_options[5];
+      option_clock_speed            = file_options[6] % 4;
+      option_sound_volume           = file_options[7] % 11;
+      option_stack_optimize         = file_options[8] % 2;
+      option_ram_dynarec_policy     = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+      option_video_renderer         = VIDEO_RENDERER_NEW;
+      option_oam_hijacking_enabled  = 0;
+      option_boot_mode              = file_options[9] % 2;
+      option_update_backup          = file_options[10] % 2;
+      option_screen_capture_format  = file_options[11] % 2;
+      option_enable_analog          = file_options[12] % 2;
+      option_analog_sensitivity     = file_options[13] % 10;
+      option_language               = file_options[14] % 5;
 
       for (i = 0; i < 16; i++)
       {
@@ -3905,52 +3783,53 @@ s32 load_config_file(void)
           menu_button = i;
       }
 
-      // hardcode triangle to main menu when home button is not available
+      // hardcode triangle to main menu when home button is not enabled
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
       option_hblank_irq_window_start = 1;
-      option_hblank_irq_window_end = 160;
+      option_hblank_irq_window_end   = 160;
 
       FILE_CLOSE(config_file);
     }
     else
       FILE_CLOSE(config_file);
 
-    apply_theme(option_theme);
     return 0;
   }
 
-  option_screen_scale = SCALED_X15_GU;
-  option_screen_mag = 170;
-  option_screen_filter = FILTER_BILINEAR;
-  psp_fps_debug = 0;
-  option_sound_volume = 10;
-  option_stack_optimize = 1;
-  option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
-  option_video_renderer = VIDEO_RENDERER_NEW;
-  option_oam_hijacking_enabled = 0;
-  option_boot_mode = 0;
-  option_update_backup = 1;		//auto
-  option_screen_capture_format = 0;
-  option_enable_analog = 0;
-  option_analog_sensitivity = 4;
-  option_hblank_irq_window_start = 1;
-  option_hblank_irq_window_end = 160;
-  option_theme = 0;
+  option_screen_scale             = SCALED_X15_GU;
+  option_screen_mag               = 170;
+  option_screen_filter            = FILTER_BILINEAR;
+  psp_fps_debug                   = 0;
+  option_sound_volume             = 10;
+  option_stack_optimize           = 1;
+  option_ram_dynarec_policy       = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+  option_video_renderer           = VIDEO_RENDERER_NEW;
+  option_oam_hijacking_enabled    = 0;
+  option_boot_mode                = 0;
+  option_update_backup            = 1;		//auto
+  option_screen_capture_format    = 0;
+  option_enable_analog            = 0;
+  option_analog_sensitivity       = 4;
+  option_hblank_irq_window_start  = 1;
+  option_hblank_irq_window_end    = 160;
+  option_psp_vsync                = 0;
+  option_theme                    = 0;
+  apply_theme(option_theme);
 
   int id_language;
   sceUtilityGetSystemParamInt(PSP_SYSTEMPARAM_ID_INT_LANGUAGE, &id_language);
   if (id_language == PSP_SYSTEMPARAM_LANGUAGE_JAPANESE)
-		option_language = 0;
-	else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_SIMPLIFIED)
-		option_language = 2;
-	else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_TRADITIONAL)
-		option_language = 3;
+    option_language = 0;
+  else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_SIMPLIFIED)
+    option_language = 2;
+  else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_CHINESE_TRADITIONAL)
+    option_language = 3;
   else if (id_language == PSP_SYSTEMPARAM_LANGUAGE_ITALIAN)
 		option_language = 4;
-	else
-		option_language = 1; // english
+  else
+    option_language = 1; // english
 
   return -1;
 }
@@ -3967,7 +3846,7 @@ s32 load_dir_cfg(char *file_name)
   const char item_state[] = "save_state_directory";
   const char item_cfg[]   = "game_config_directory";
   const char item_snap[]  = "snapshot_directory";
-  const char item_cheat[]  = "cheat_directory";
+  const char item_cheat[] = "cheat_directory";
 
   FILE *dir_config;
   SceUID check_dir = -1;
@@ -4031,11 +3910,11 @@ s32 load_dir_cfg(char *file_name)
     }
   }
 
-  dir_roms[0]  = 0;
-  dir_save[0]  = 0;
-  dir_state[0] = 0;
-  dir_cfg[0]   = 0;
-  dir_snap[0]  = 0;
+  dir_roms[0]   = 0;
+  dir_save[0]   = 0;
+  dir_state[0]  = 0;
+  dir_cfg[0]    = 0;
+  dir_snap[0]   = 0;
   dir_cheat[0]  = 0;
 
   dir_config = fopen(file_name, "r");
