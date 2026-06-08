@@ -286,7 +286,7 @@ static int png_create_datastream(SceUID fd, u16 *screen_image)
 
 
 /*--------------------------------------------------------
-  PNG•Û‘¶
+  PNG�ۑ�
 --------------------------------------------------------*/
 
 int save_png(const char *path, u16 *screen_image)
