@@ -72,7 +72,7 @@ extern u32 option_screen_capture_format;
 extern u32 option_enable_analog;
 extern u32 option_analog_sensitivity;
 extern u32 option_language;
-
+extern u32 option_theme;
 extern u32 option_frameskip_type;
 extern u32 option_frameskip_value;
 extern u32 option_clock_speed;

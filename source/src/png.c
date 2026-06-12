@@ -10,6 +10,8 @@
 
 #include "common.h"
 
+extern void print_swap_aware(const char *src, u32 x, u32 y, u16 color, u16 bg);
+
 
 #define PNG_Signature "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
 
@@ -56,7 +58,7 @@ static void png_error_msg(int number)
   draw_box_line(120, 60, 360, 210, COLOR15_WHITE);
 
   print_string(MSG[MSG_ERR_SS_PNG_0 + number], X_POS_CENTER, 100, COLOR15_WHITE, BG_NO_FILL);
-  print_string(MSG[MSG_ERR_CONT], X_POS_CENTER, 160, COLOR15_WHITE, BG_NO_FILL);
+  print_swap_aware(MSG[MSG_ERR_CONT], X_POS_CENTER, 160, COLOR15_WHITE, BG_NO_FILL);
   flip_screen(1);
 
   while (gui_action == CURSOR_NONE)

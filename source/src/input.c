@@ -20,11 +20,13 @@
 
 #include "common.h"
 
+extern u32 option_swap_confirm_buttons;
+
 
 #define PSP_ALL_BUTTON_MASK 0xFFFF
 
-#define BUTTON_REPEAT_START    200000
-#define BUTTON_REPEAT_CONTINUE 50000
+#define BUTTON_REPEAT_START    300000
+#define BUTTON_REPEAT_CONTINUE 200000
 
 #define PSP_CTRL_ANALOG_UP    (1 << 28)
 #define PSP_CTRL_ANALOG_DOWN  (1 << 29)
@@ -215,11 +217,22 @@ GUI_ACTION_TYPE get_gui_input(void)
   if ((new_buttons & PSP_CTRL_SELECT) != 0)
     new_button = CURSOR_DEFAULT;
 
-  if ((new_buttons & PSP_CTRL_CIRCLE) != 0)
-    new_button = CURSOR_SELECT;
+  if (option_swap_confirm_buttons == 0)
+  {
+    if ((new_buttons & PSP_CTRL_CIRCLE) != 0)
+      new_button = CURSOR_SELECT;
 
-  if ((new_buttons & PSP_CTRL_CROSS) != 0)
-    new_button = CURSOR_EXIT;
+    if ((new_buttons & PSP_CTRL_CROSS) != 0)
+      new_button = CURSOR_EXIT;
+  }
+  else
+  {
+    if ((new_buttons & PSP_CTRL_CROSS) != 0)
+      new_button = CURSOR_SELECT;
+
+    if ((new_buttons & PSP_CTRL_CIRCLE) != 0)
+      new_button = CURSOR_EXIT;
+  }
 
   if ((new_buttons & PSP_CTRL_SQUARE) != 0)
     new_button = CURSOR_BACK;
@@ -324,40 +337,7 @@ u32 update_input(void)
   last_buttons = buttons;
 
   if ((enable_home_menu != 0) && ((non_repeat_buttons & PSP_CTRL_HOME) != 0))
-  {
-    // Safety wrapper for HOME button menu call to help debug crashes
-    FILE *debug_log = fopen("froggba_debug.log", "a");
-    if (debug_log) {
-      fprintf(debug_log, "HOME button pressed - calling menu() safely\n");
-      fflush(debug_log);
-      fclose(debug_log);
-    }
-    
-    u32 menu_result = menu();
-    
-    debug_log = fopen("froggba_debug.log", "a");
-    if (debug_log) {
-      fprintf(debug_log, "menu() returned: %lu\n", (unsigned long)menu_result);
-      fflush(debug_log);
-      fclose(debug_log);
-    }
-    
-    // Ensure HOME button is released before returning to prevent immediate re-trigger
-    SceCtrlData ctrl_wait;
-    do {
-      sceCtrlReadBufferPositive(&ctrl_wait, 1);
-      sceKernelDelayThread(16000); // ~16ms delay (1/60th second)
-    } while ((ctrl_wait.Buttons & PSP_CTRL_HOME) != 0);
-    
-    debug_log = fopen("froggba_debug.log", "a");
-    if (debug_log) {
-      fprintf(debug_log, "HOME button released, returning result: %lu\n", (unsigned long)menu_result);
-      fflush(debug_log);
-      fclose(debug_log);
-    }
-    
-    return menu_result;
-  }
+    return menu();
 
   for (i = 0; i < 16; i++)
   {

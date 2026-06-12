@@ -46,6 +46,8 @@ u32 option_screen_capture_format = 0;
 u32 option_enable_analog = 0;
 u32 option_analog_sensitivity = 4;
 u32 option_language = 0;
+u32 option_theme = 0;
+u32 option_swap_confirm_buttons = 0;
 
 u32 option_frameskip_type = FRAMESKIP_AUTO;
 u32 option_frameskip_value = 9;
@@ -392,6 +394,24 @@ u32 update_gba(void)
 
           if (update_input() != 0)
             continue;
+
+          // ===================================================================
+          // TEST CRASH HANDLER — REMOVE AFTER TESTING
+          // ===================================================================
+          // Press L + R + SELECT simultaneously to trigger an intentional
+          // bus error. This tests that exception.prx and ExceptionHandler()
+          // are working. Remove this block once verified.
+          /* {
+              SceCtrlData test_pad;
+              sceCtrlPeekBufferPositive(&test_pad, 1);
+              if ((test_pad.Buttons & (PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT)) ==
+                  (PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT)) {
+                  _sw(0, 0);  // Intentional bus error — triggers crash handler
+              }
+          } */
+          // ===================================================================
+          // END TEST CRASH HANDLER
+          // ===================================================================
 
           if (!skip_next_frame)
             (*update_screen)();
@@ -784,9 +804,10 @@ static void setup_main(void)
   //   enable_home_menu = 0;
   // else
   //   enable_home_menu = 1;
-  enable_home_menu = 0;  // Always disable home menu without kernel mode
+  enable_home_menu = 1;
 
   load_config_file();
+  load_theme_config();
 
   setup_callbacks();
   sceImposeSetHomePopup(enable_home_menu ^ 1);
@@ -1039,10 +1060,7 @@ void error_msg(const char *text, u8 confirm)
       sprintf(text_buff, "%s\n\n%s", text, MSG[MSG_ERR_QUIT]);
       break;
   }
-  if (option_language == 0)
-  print_string(text_buff, 6, 6, COLOR15_WHITE, COLOR15_BLACK);
-  else
-  print_string_gbk(text_buff, 6, 6, COLOR15_WHITE, COLOR15_BLACK);
+  print_swap_aware(text_buff, 6, 6, COLOR15_WHITE, COLOR15_BLACK);
   flip_screen(1);
 
   while (gui_action == CURSOR_NONE)
@@ -1065,13 +1083,12 @@ u32 yesno_dialog(const char *text)
   if (option_language == 0)
   {
     print_string(text, X_POS_CENTER, dlg_y1 + 24, COLOR15_WHITE, COLOR15_BLACK);
-    print_string(MSG[MSG_YES_NO], X_POS_CENTER, dlg_y1 + 56, COLOR15_WHITE, COLOR15_BLACK);
   }
   else
   {
     print_string_gbk(text, X_POS_CENTER, dlg_y1 + 24, COLOR15_WHITE, COLOR15_BLACK);
-    print_string_gbk(MSG[MSG_YES_NO], X_POS_CENTER, dlg_y1 + 56, COLOR15_WHITE, COLOR15_BLACK);
   }
+  print_swap_aware(MSG[MSG_YES_NO], X_POS_CENTER, dlg_y1 + 56, COLOR15_WHITE, COLOR15_BLACK);
 
   flip_screen(1);
 

@@ -57,3 +57,6 @@ LIBS = src/libpower/libpsppower.a -lpspgu -lpsprtc -lpspaudio -lpspkubridge
 
 include ${PSPSDK}/lib/build.mak
 
+all: $(EXTRA_TARGETS)
+	@$(MAKE) -C prx/exceptionHandler/prx
+	@cp prx/exceptionHandler/prx/exception.prx .
