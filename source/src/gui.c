@@ -22,12 +22,13 @@
 
 extern u32 option_swap_confirm_buttons;
 
-#define GPSP_THEME_FILENAME             "tempgba_theme.cfg"
-#define GPSP_CONFIG_FILENAME            "tempgba.cfg"
+#define GPSP_THEME_FILENAME             "retempgba_theme.cfg"
+#define GPSP_CONFIG_FILENAME            "retempgba_config.cfg"
 #define GPSP_CONFIG_NUM_GAMEPAD         16
 #define GPSP_CONFIG_NUM_PRE_EXTRA_SLOT  (18 + GPSP_CONFIG_NUM_GAMEPAD) // 34 words: options 0-17, gamepad 18-33
 #define GPSP_CONFIG_NUM_PRE_WINDOW_END  (19 + GPSP_CONFIG_NUM_GAMEPAD) // 35 words: + slot 18 = HBLANK cap, gamepad 19-34
 #define GPSP_CONFIG_NUM_PRE_VSYNC       (20 + GPSP_CONFIG_NUM_GAMEPAD) // 36 words: slots 18-19 HBLANK win, gamepad 20-35
+#define GPSP_CONFIG_NUM_PRE_SWAP_THEME  (21 + GPSP_CONFIG_NUM_GAMEPAD) // 37 words: slot 20 VSync, gamepad 21-36 (pre swap/theme slots)
 #define GPSP_CONFIG_NUM                 (23 + GPSP_CONFIG_NUM_GAMEPAD) // 39 words: slot 20 PSP VSync, slot 21 swap buttons, slot 22 themes, gamepad 23-38
 #define GPSP_CONFIG_NUM_LEGACY          (17 + GPSP_CONFIG_NUM_GAMEPAD) // before renderer option
 #define GPSP_GAME_CONFIG_NUM            (7 + 16)
@@ -2979,7 +2980,7 @@ u32 menu(void)
                   case 17: // Sleep Mode
                     menu_suspend();
                     break;
-                  case 18: // Exit TempGBA
+                  case 18: // Exit ReTempGBA
                     quit();
                     break;
                   default:
@@ -3518,6 +3519,66 @@ s32 load_config_file(void)
       }
 
       // hardcode triangle to main menu when home button is not enabled
+      if ((enable_home_menu == 0) && (menu_button == -1))
+        gamepad_config_map[0] = BUTTON_ID_MENU;
+
+      FILE_CLOSE(config_file);
+    }
+    else if (file_size == (GPSP_CONFIG_NUM_PRE_SWAP_THEME * 4))
+    {
+      u32 i;
+      u32 file_options[file_size / 4];
+      s32 menu_button = -1;
+
+      FILE_READ_ARRAY(config_file, file_options);
+
+      option_screen_scale     = file_options[0] % 5;
+      option_screen_mag       = file_options[1] % 201;
+      option_screen_filter    = file_options[2] % 2;
+      psp_fps_debug           = file_options[3] % 2;
+      option_frameskip_type   = file_options[4] % 3;
+      option_frameskip_value  = file_options[5];
+      option_clock_speed      = file_options[6] % 4;
+      option_sound_volume     = file_options[7] % 11;
+      option_stack_optimize   = file_options[8] % 2;
+      {
+        u32 stored_ram_dynarec_policy = file_options[9];
+        if (stored_ram_dynarec_policy >= 4 && stored_ram_dynarec_policy <= 6)
+        {
+          option_ram_dynarec_policy = stored_ram_dynarec_policy - 4;
+        }
+        else if (stored_ram_dynarec_policy <= 1)
+        {
+          option_ram_dynarec_policy = stored_ram_dynarec_policy + 1;
+        }
+        else
+        {
+          option_ram_dynarec_policy = RAM_DYNAREC_PARTIAL_WITH_REUSE;
+        }
+      }
+      option_video_renderer           = file_options[10] % 2;
+      option_oam_hijacking_enabled    = file_options[11] % 2;
+      option_boot_mode                = file_options[12] % 2;
+      option_update_backup            = file_options[13] % 2;
+      option_screen_capture_format    = file_options[14] % 2;
+      option_enable_analog            = file_options[15] % 2;
+      option_analog_sensitivity       = file_options[16] % 10;
+      option_language                 = file_options[17] % 5;
+      option_hblank_irq_window_start  = file_options[18] % 228;
+      option_hblank_irq_window_end    = file_options[19] % 228;
+      option_psp_vsync                = file_options[20] % 2;
+      option_swap_confirm_buttons     = 0;
+      option_theme                    = 0;
+      apply_theme(option_theme);
+
+      for (i = 0; i < 16; i++)
+      {
+        gamepad_config_map[i] = file_options[21 + i] % (BUTTON_ID_NONE + 1);
+
+        if (gamepad_config_map[i] == BUTTON_ID_MENU)
+          menu_button = i;
+      }
+
       if ((enable_home_menu == 0) && (menu_button == -1))
         gamepad_config_map[0] = BUTTON_ID_MENU;
 
