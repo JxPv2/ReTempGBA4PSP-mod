@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include "boxart.h"
 
 extern u32 option_swap_confirm_buttons;
 
@@ -1077,6 +1078,7 @@ char dir_state[MAX_PATH];
 char dir_cfg[MAX_PATH];
 char dir_snap[MAX_PATH];
 char dir_cheat[MAX_PATH];//cheat
+char dir_boxart[MAX_PATH];
 
 u32 menu_cheat_page = 0;
 u32 ALIGN_DATA gamepad_config_line_to_button[] =
@@ -1173,6 +1175,9 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
   char batt_str[40];
   u16 color_batt_life = color_batt_normal;
   u32 counter = 0;
+
+  char current_boxart_rom[MAX_FILE];
+  current_boxart_rom[0] = '\0';
 
   auto void filelist_term(void);
   auto void malloc_error(void);
@@ -1399,7 +1404,7 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
         }
       }
 
-      for (i = 0; i < FILE_LIST_ROWS; i++)
+      for (i = 0; i < ((column == FILE_LIST) ? 8 : 20); i++)
       {
         current_dir_number = i + scroll_value[DIR_LIST];
 
@@ -1414,20 +1419,26 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
         }
       }
 
-      if (num[DIR_LIST] > FILE_LIST_ROWS)
+      if (num[DIR_LIST] > ((column == FILE_LIST) ? 8 : 20))
       {
+        u32 dir_rows = (column == FILE_LIST) ? 8 : 20;
         if (scroll_value[DIR_LIST] != 0)
           print_string(FONT_CURSOR_UP_FILL, PSP_SCREEN_WIDTH - (FONTWIDTH * 2), FILE_LIST_POS_Y, color_scroll_bar, color_bg);
 
-        if (num[DIR_LIST] > (scroll_value[DIR_LIST] + FILE_LIST_ROWS))
-          print_string(FONT_CURSOR_DOWN_FILL, PSP_SCREEN_WIDTH - (FONTWIDTH * 2), FILE_LIST_POS_Y + ((FILE_LIST_ROWS - 1) * FONTHEIGHT), color_scroll_bar, color_bg);
+        if (num[DIR_LIST] > (scroll_value[DIR_LIST] + dir_rows))
+          print_string(FONT_CURSOR_DOWN_FILL, PSP_SCREEN_WIDTH - (FONTWIDTH * 2), FILE_LIST_POS_Y + ((dir_rows - 1) * FONTHEIGHT), color_scroll_bar, color_bg);
       }
+
+      /* Draw boxart for selected ROM */
+      boxart_draw(SCREEN_IMAGE_POS_X+108, SCREEN_IMAGE_POS_Y+70, color_inactive_item);
 
       __draw_volume_status(1);
       flip_screen(1);
 
 
       gui_action = get_gui_input();
+
+      u32 visible_rows = (column == FILE_LIST) ? FILE_LIST_ROWS : FILE_LIST_ROWS;
 
       switch (gui_action)
       {
@@ -1436,7 +1447,7 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
           {
             selection[column]++;
 
-            if (in_scroll[column] == (FILE_LIST_ROWS - 1))
+            if (in_scroll[column] == (visible_rows - 1))
               scroll_value[column]++;
             else
               in_scroll[column]++;
@@ -1450,13 +1461,13 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
             {
               selection[column] += PAGE_SCROLL_NUM;
 
-              if (in_scroll[column] >= (FILE_LIST_ROWS - PAGE_SCROLL_NUM))
+              if (in_scroll[column] >= (visible_rows - PAGE_SCROLL_NUM))
               {
                 scroll_value[column] += PAGE_SCROLL_NUM;
 
-                if (scroll_value[column] > (num[column] - FILE_LIST_ROWS))
+                if (scroll_value[column] > (num[column] - visible_rows))
                 {
-                  scroll_value[column] = num[column] - FILE_LIST_ROWS;
+                  scroll_value[column] = num[column] - visible_rows;
                   in_scroll[column] = selection[column] - scroll_value[column];
                 }
               }
@@ -1470,12 +1481,12 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
               selection[column] = num[column] - 1;
               in_scroll[column] += PAGE_SCROLL_NUM;
 
-              if (in_scroll[column] >= (FILE_LIST_ROWS - 1))
+              if (in_scroll[column] >= (visible_rows - 1))
               {
-                if (num[column] > (FILE_LIST_ROWS - 1))
+                if (num[column] > (visible_rows - 1))
                 {
-                  in_scroll[column] = FILE_LIST_ROWS - 1;
-                  scroll_value[column] = num[column] - FILE_LIST_ROWS;
+                  in_scroll[column] = visible_rows - 1;
+                  scroll_value[column] = num[column] - visible_rows;
                 }
                 else
                 {
@@ -1537,7 +1548,12 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
           if (column == FILE_LIST)
           {
             if (num[DIR_LIST] != 0)
+            {
               column = DIR_LIST;
+              /* Clamp directory scroll to new full-height view */
+              if (scroll_value[DIR_LIST] > num[DIR_LIST] - 20)
+                scroll_value[DIR_LIST] = (num[DIR_LIST] > 20) ? num[DIR_LIST] - 20 : 0;
+            }
           }
           break;
 
@@ -1545,7 +1561,14 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
           if (column == DIR_LIST)
           {
             if (num[FILE_LIST] != 0)
+            {
               column = FILE_LIST;
+              /* Clamp directory scroll to shrunk view when returning to files */
+              if (scroll_value[DIR_LIST] > num[DIR_LIST] - 8)
+                scroll_value[DIR_LIST] = (num[DIR_LIST] > 8) ? num[DIR_LIST] - 8 : 0;
+              if (in_scroll[DIR_LIST] >= 8)
+                in_scroll[DIR_LIST] = 7;
+            }
           }
           break;
 
@@ -1553,6 +1576,7 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
           if (column == DIR_LIST)
           {
             repeat = 0;
+            current_boxart_rom[0] = '\0';
             chdir(dir_list[selection[DIR_LIST]]);
           }
           else
@@ -1572,6 +1596,7 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
             break;
 
           repeat = 0;
+          current_boxart_rom[0] = '\0';
           chdir("..");
           break;
 
@@ -1587,8 +1612,29 @@ s32 load_file(const char **wildcards, char *result, char *default_dir_name)
           break;
       }
 
+      /* Load boxart for currently selected ROM */
+      if (column == FILE_LIST && num[FILE_LIST] > 0)
+      {
+        const char *sel_file = file_list[selection[FILE_LIST]];
+        if (strcmp(current_boxart_rom, sel_file) != 0)
+        {
+          strncpy(current_boxart_rom, sel_file, sizeof(current_boxart_rom) - 1);
+          current_boxart_rom[sizeof(current_boxart_rom) - 1] = '\0';
+          boxart_load(sel_file);
+        }
+      }
+      else
+      {
+        if (current_boxart_rom[0] != '\0')
+        {
+          current_boxart_rom[0] = '\0';
+          boxart_free();
+        }
+      }
+
     } /* end while (repeat) */
 
+    boxart_free();
     filelist_term();
 
   } /* end while (return_value == 1) */
@@ -3976,6 +4022,7 @@ s32 load_dir_cfg(char *file_name)
   const char item_cfg[]   = "game_config_directory";
   const char item_snap[]  = "snapshot_directory";
   const char item_cheat[] = "cheat_directory";
+  const char item_boxart[] = "boxart_directory";
 
   FILE *dir_config;
   SceUID check_dir = -1;
@@ -4062,6 +4109,7 @@ s32 load_dir_cfg(char *file_name)
         set_directory(dir_cfg,   item_cfg);
         set_directory(dir_snap,  item_snap);
         set_directory(dir_cheat, item_cheat);
+        set_directory(dir_boxart, item_boxart);
       }
     }
 
@@ -4073,6 +4121,7 @@ s32 load_dir_cfg(char *file_name)
     check_directory(dir_cfg,   item_cfg);
     check_directory(dir_snap,  item_snap);
     check_directory(dir_cheat, item_cheat);
+    check_directory(dir_boxart, item_boxart);
 
     if (str_line > 7)
     {
@@ -4097,6 +4146,7 @@ s32 load_dir_cfg(char *file_name)
   strcpy(dir_cfg,   main_path);
   strcpy(dir_snap,  main_path);
   strcpy(dir_cheat, main_path);
+  strcpy(dir_boxart, main_path);
   apply_theme(option_theme);
   return -1;
 }
