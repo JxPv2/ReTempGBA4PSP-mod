@@ -25,8 +25,8 @@ extern u32 option_swap_confirm_buttons;
 
 #define PSP_ALL_BUTTON_MASK 0xFFFF
 
-#define BUTTON_REPEAT_START    300000
-#define BUTTON_REPEAT_CONTINUE 200000
+#define BUTTON_REPEAT_START    200000
+#define BUTTON_REPEAT_CONTINUE 50000
 
 #define PSP_CTRL_ANALOG_UP    (1 << 28)
 #define PSP_CTRL_ANALOG_DOWN  (1 << 29)

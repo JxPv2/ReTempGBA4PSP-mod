@@ -1721,6 +1721,82 @@ static void reload_cheats_page(void)
 static MenuType *all_menus[MAX_MENUS];
 static u32 num_all_menus = 0;
 
+static int menu_string_has_gbk(const char *str)
+{
+    const u8 *p = (const u8 *)str;
+
+    if (str == NULL)
+        return 0;
+
+    while (*p != '\0')
+    {
+        if (*p >= 0x81 && *p <= 0xFE)
+            return 1;
+        p++;
+    }
+    return 0;
+}
+
+static void print_menu_line(const char *str, s16 x, s16 y, u16 fg, s16 bg)
+{
+    if (option_language == 0 && !menu_string_has_gbk(str))
+        print_string(str, x, y, fg, bg);
+    else
+        print_string_gbk(str, x, y, fg, bg);
+}
+
+static void format_menu_option_line(char *dst, u32 dst_size, const MenuOptionType *opt)
+{
+    const char *fmt;
+
+    if (dst == NULL || dst_size == 0 || opt == NULL)
+        return;
+
+    fmt = opt->display_string;
+    if (fmt == NULL)
+    {
+        dst[0] = '\0';
+        return;
+    }
+
+    if (opt->option_type & NUMBER_SELECTION_OPTION)
+    {
+        sprintf(dst, fmt, *(opt->current_option));
+        return;
+    }
+
+    if (opt->option_type & STRING_SELECTION_OPTION)
+    {
+        const char **choices = (const char **)opt->options;
+        u32 idx = *(opt->current_option);
+        const char *value = "";
+        const char *spec;
+
+        if (choices != NULL && idx < opt->num_options && choices[idx] != NULL)
+            value = choices[idx];
+
+        spec = strstr(fmt, "%s");
+        if (spec != NULL)
+        {
+            u32 prefix_len = (u32)(spec - fmt);
+
+            if (prefix_len >= dst_size)
+                prefix_len = dst_size - 1;
+            memcpy(dst, fmt, prefix_len);
+            dst[prefix_len] = '\0';
+            strncat(dst, value, dst_size - (u32)strlen(dst) - 1);
+            return;
+        }
+
+        strncpy(dst, fmt, dst_size - 1);
+        dst[dst_size - 1] = '\0';
+        return;
+    }
+
+    strncpy(dst, fmt, dst_size - 1);
+    dst[dst_size - 1] = '\0';
+}
+
 static void menu_refresh_language(void)
 {
     u32 i, j;
@@ -2652,6 +2728,7 @@ u32 menu(void)
   all_menus[8] = &cheats_misc_menu;
   num_all_menus = MAX_MENUS;
 
+  menu_refresh_language();
 
   void choose_menu(MenuType *new_menu)
   {
@@ -2783,22 +2860,11 @@ u32 menu(void)
 
       for (i = 0; i < current_menu->num_options; i++, display_option++)
       {
-      if (display_option->option_type & NUMBER_SELECTION_OPTION)
-      {
-        sprintf(line_buffer, display_option->display_string, *(display_option->current_option));
-      }
-      else
-      {
-        if (display_option->option_type & STRING_SELECTION_OPTION)
-          sprintf(line_buffer, display_option->display_string, ((u32 *)display_option->options)[*(display_option->current_option)]);
-        else
-          strcpy(line_buffer, display_option->display_string);
-      }
-/*file charset*/
-		if (option_language == 0)
-			print_string(line_buffer, MENU_LIST_POS_X, (display_option->line_number * FONTHEIGHT) + 28, (display_option == current_option) ? color_active_item : color_inactive_item, BG_NO_FILL);
-		else
-			print_string_gbk(line_buffer, MENU_LIST_POS_X, (display_option->line_number * FONTHEIGHT) + 28, (display_option == current_option) ? color_active_item : color_inactive_item, BG_NO_FILL);
+        format_menu_option_line(line_buffer, sizeof(line_buffer), display_option);
+        print_menu_line(line_buffer, MENU_LIST_POS_X,
+                        (display_option->line_number * FONTHEIGHT) + 28,
+                        (display_option == current_option) ? color_active_item : color_inactive_item,
+                        BG_NO_FILL);
       }
     }
 
