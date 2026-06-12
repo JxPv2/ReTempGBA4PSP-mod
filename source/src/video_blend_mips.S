@@ -64,19 +64,15 @@ blend_loop:
   addu   $t3, $t3, $t8
   lhu    $t3, 0($t3)             # pixel_bottom
 
-  sll    $t6, $t2, 16
-  or     $t2, $t2, $t6
-  and    $t2, $t2, $v0           # top dilated
+  ins    $t2, $t2, 16, 16         # top dilated (0G0R0B)
+  and    $t2, $t2, $v0
 
-  sll    $t6, $t3, 16
-  or     $t3, $t3, $t6
-  and    $t3, $t3, $v0           # bottom dilated
+  ins    $t3, $t3, 16, 16         # bottom dilated
+  and    $t3, $t3, $v0
 
-  multu  $t3, $t5
-  mflo   $t3
-  multu  $t2, $t4
+  multu  $t3, $t5                 # LO = bottom * blend_b
+  maddu  $t2, $t4                 # LO += top * blend_a
   mflo   $t2
-  addu   $t2, $t2, $t3
 
   # Always >> 4 (matches C blend_pixel / blend_saturate_pixel).
   srl    $t2, $t2, 4
