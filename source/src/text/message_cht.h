@@ -57,7 +57,7 @@
   "睡眠模式",
 
   // MSG_MAIN_MENU_11
-  "退出 TempGBA",
+  "退出 ReTempGBA",
 
   // MSG_MAIN_MENU_HELP_0
   FONT_BTN_CIRCLE_GBK ":載入   " FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":變更插槽",
@@ -681,7 +681,7 @@
   "模擬器選項",
 
   // MSG_PREVIEW_TITLE
-  "TempGBA",
+  "ReTempGBA",
 
   // MSG_PREVIEW_ITEM_0
   "載入狀態",
