@@ -1,4 +1,4 @@
-# TempGBA4PSP-mod (2025 Build)
+# ReTempGBA4PSP-mod (2025 Build)
 
 Based on phoe-nix' Github repo.
 
