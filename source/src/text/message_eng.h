@@ -57,7 +57,7 @@
   "Sleep mode",
 
   // MSG_MAIN_MENU_11
-  "Exit TempGBA",
+  "Exit ReTempGBA",
 
   // MSG_MAIN_MENU_HELP_0
   FONT_BTN_CIRCLE_GBK ":Load   " FONT_CURSOR_LEFT_GBK FONT_CURSOR_RIGHT_GBK ":Change slot",
@@ -680,7 +680,7 @@
   "Emulator options",
 
   // MSG_PREVIEW_TITLE
-  "TempGBA",
+  "ReTempGBA",
 
   // MSG_PREVIEW_ITEM_0
   "Load state",
